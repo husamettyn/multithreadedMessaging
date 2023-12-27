@@ -25,8 +25,8 @@ void receive_message(int client_sockfd, char* buffer, size_t buffsize) {
     read(client_sockfd, buffer, buffsize - 1);
 }
 
-void send_message(int sockfd, char* message) {
-    send(sockfd, message, strlen(message), 0);
+int send_message(int sockfd, char* message) {
+    return send(sockfd, message, strlen(message), 0);
 }
 
 void writeStructToFile(char* filename, user* data, int numEntries) {
@@ -85,28 +85,48 @@ user* readStructFromFile(char* filename, size_t* numEntries) {
     }
 }
 
-void listUsers(user* data, size_t numEntries) {
-    printf("User ID\tPhone\t\t\tName\n");
-    printf("------\t-----------------------\t----------------------------\n");
-
-    for (size_t i = 0; i < numEntries; ++i) {
-        printf("%d\t%s\t\t%s\n", data[i].userid, data[i].phone, data[i].name);
-    }
-}
-
-void viewContactAll(int sockid){
-    size_t numEntries = 0;
-    user* data = readStructFromFile("users.txt", &numEntries);
+void sendContact(int sockid){
     char buffer[BUFFER_SIZE];
+    receive_message(sockid, buffer, BUFFER_SIZE);
 
+    char* user_id_str = buffer + strlen("/recvContact");
+    int userid = atoi(user_id_str);
+
+    char filename[40];
+    if(userid != -1){
+        sprintf(filename, "data/%d/contacts.txt", userid);
+    }
+    else{
+        sprintf(filename, "users.txt");
+    }
+
+    size_t numEntries = 0;
+    user* data = readStructFromFile(filename, &numEntries);
+    
+
+    printf("sending contacts\n");
     if(numEntries == 0)
         send_message(sockid, "Kayitli Kullanici Yok.");
     else{
-        snprintf(buffer, BUFFER_SIZE, "%d", numEntries);
+        snprintf(buffer, BUFFER_SIZE, "%d", (int)numEntries);
         send_message(sockid, buffer);
+        printf("%s\n", buffer);
     }
     int i;
+    for(i=0; i<numEntries; i++){
+        char buffer2[BUFFER_SIZE];
+        bzero(buffer, BUFFER_SIZE);
+        bzero(buffer2, BUFFER_SIZE);
+        snprintf(buffer, BUFFER_SIZE, "%s, %s, %d", data[i].name, data[i].phone, data[i].userid);
+        
+        do{
+            send_message(sockid, buffer);
 
+            receive_message(sockid, buffer2, BUFFER_SIZE);
+        }while(strcmp(buffer2, "received") != 0);
+        printf("%s\n", buffer);
+    }
+    return;
     
 }
 
@@ -152,6 +172,10 @@ void initializeFileSystem(int userid) {
             // Handle error as needed
         }
         fclose(file);
+}
+
+void sendDatas(int sockid, int userid){
+    sendContact(sockid);
 }
 
 void logUser(int sockid, int userid) {
@@ -211,9 +235,9 @@ void logUser(int sockid, int userid) {
 
     // Free allocated memory for user data
     free(data);
+
+    sendDatas(sockid, userid);
 }
-
-
 
 void *handle_client(void *arg) {
     int socket_fd = *((int *)arg);
@@ -238,6 +262,8 @@ void *handle_client(void *arg) {
             printf("User %d is logged out\n", user_id);
             status = 0;
         }
+        else if(strcmp(buffer, "") != 0)
+            printf("%s\n", buffer);
     }
 
     // Close the socket and exit the thread

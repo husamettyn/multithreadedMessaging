@@ -24,32 +24,6 @@ typedef struct{
 	char name[40];
 } user;
 
-void receive_message(int client_sockfd, char* buffer, size_t buffsize) {
-    bzero(buffer, BUFFER_SIZE);
-    read(client_sockfd, buffer, buffsize - 1);
-    //printf("Server Side: %s\n", buffer);
-}
-
-void send_message(int sockfd, char* message) {
-    //printf("Client Side: %s\n", message);
-    send(sockfd, message, strlen(message), 0);
-}
-
-void viewContactAll(int sockid){
-    char buffer[BUFFER_SIZE];
-    receive_message(sockid, buffer, BUFFER_SIZE);
-
-    if(strcmp(buffer, "Kayitli Kullanici Yok.") == 0){
-        printf("Kayitli Kullanici Yok.\n");
-    }
-    else{
-        int numEntries = atoi(buffer);
-    }
-    int i;
-    
-    
-}
-
 void display_menu(user myUser) {
 
     system("clear");
@@ -65,14 +39,105 @@ void display_menu(user myUser) {
     printf("Enter your choice: ");
 }
 
+void displayContact(user* data, int numEntries) {
+    int i;
+    printf("%-10s|%-20s|%-40s\n", "User ID", "Phone", "Name");
+    printf("--------------------------------------------\n");
+
+    for (i = 0; i < numEntries; ++i) {
+        printf("%-10d|%-20s|%-40s\n", data[i].userid, data[i].phone, data[i].name);
+        if (i < numEntries - 1) {
+            printf("|──────────|────────────────────|----------------------------------------\n");
+        }
+    }
+}
+
+void receive_message(int client_sockfd, char* buffer, size_t buffsize) {
+    bzero(buffer, BUFFER_SIZE);
+    read(client_sockfd, buffer, buffsize - 1);
+    //printf("Server Side: %s\n", buffer);
+}
+
+void send_message(int sockfd, char* message) {
+    //printf("Client Side: %s\n", message);
+    send(sockfd, message, strlen(message), 0);
+}
+
+user* recvContactAll(int sockid, int* num){
+    int numEntries;
+    char buffer[BUFFER_SIZE];
+    send_message(sockid, "/recvContactAll");
+
+    receive_message(sockid, buffer, BUFFER_SIZE);
+    
+    user* data;
+
+    if(strcmp(buffer, "Kayitli Kullanici Yok.") == 0){
+        printf("Kayitli Kullanici Yok.\n");
+        return NULL;
+    }
+    else{
+        numEntries = atoi(buffer);
+        data = (user*)malloc(numEntries * sizeof(user));
+        *num = numEntries;
+    }
+    int i;
+    for(i=0; i<numEntries; i++){
+        receive_message(sockid, buffer, BUFFER_SIZE);
+        sscanf(buffer, "%[^,], %[^,], %d", data[i].name, data[i].phone, &data[i].userid);
+        printf("%s, %s %d\n", data[i].name, data[i].phone, data[i].userid);
+        send_message(sockid, "received");
+    }
+    
+    return data;
+}
+
+user* recvContact(int sockid, int* num, int userid){
+    
+    int numEntries;
+    char buffer[BUFFER_SIZE];
+    sprintf(buffer, "/recvContact %d", userid);
+    send_message(sockid, buffer);
+
+    receive_message(sockid, buffer, BUFFER_SIZE);
+    
+    user* data;
+
+    if(strcmp(buffer, "Kayitli Kullanici Yok.") == 0){
+        printf("Kayitli Kullanici Yok.\n");
+        return NULL;
+    }
+    else{
+        numEntries = atoi(buffer);
+        data = (user*)malloc(numEntries * sizeof(user));
+        *num = numEntries;
+    }
+    int i;
+    for(i=0; i<numEntries; i++){
+        receive_message(sockid, buffer, BUFFER_SIZE);
+        sscanf(buffer, "%[^,], %[^,], %d", data[i].name, data[i].phone, &data[i].userid);
+        printf("%s, %s %d\n", data[i].name, data[i].phone, data[i].userid);
+        send_message(sockid, "received");
+    }
+    
+    return data;
+}
+
+
 void init_main(user myUser, int sockid){
     char buffer[BUFFER_SIZE];
+    int numEntries = 0;
+    user* allContacts = recvContactAll(sockid, &numEntries);
+    //displayContact(allContacts, numEntries);
+    int myNumEntries = 0;
+    user* myContacts = recvContact(sockid, &myNumEntries, myUser.userid);
 
     while (1){
         bzero(buffer, BUFFER_SIZE);
         int choice;
 
         display_menu(myUser);
+        
         scanf("%d", &choice);
         switch (choice) {
             case 1:
@@ -144,7 +209,7 @@ void login_to_server(int sockid, int userid){
     else{
         user myData;
         sscanf(buffer, "%[^,], %[^,], %d", myData.name, myData.phone, &myData.userid);
-        printf("%s, %s, %d\n", myData.name, myData.phone, myData.userid);
+        
         init_main(myData, sockid);
     }
 }
