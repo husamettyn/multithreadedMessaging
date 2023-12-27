@@ -1,0 +1,2 @@
+gcc server1.c -o sserver.out
+gcc client1.c -o cclient.out
