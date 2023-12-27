@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <asm-generic/socket.h>
+#include <sys/stat.h>
 
 #define PORT 8080
 #define BUFFER_SIZE 1024
@@ -28,13 +29,14 @@ void send_message(int sockfd, char* message) {
     send(sockfd, message, strlen(message), 0);
 }
 
-void writeStructToFile(char* filename, user* data, size_t numEntries) {
+void writeStructToFile(char* filename, user* data, int numEntries) {
     FILE* file = fopen(filename, "w"); // Open the file for writing (overwrite mode)
     int i;
+    
 
     if (file != NULL) {
         // Write the counter indicator
-        fprintf(file, "%zu\n", numEntries);
+        fprintf(file, "%d\n", numEntries);
 
         // Write each user to the file
         for (i = 0; i < numEntries; ++i) {
@@ -58,7 +60,7 @@ user* readStructFromFile(char* filename, size_t* numEntries) {
     int i;
     if (file != NULL) {
         // Read the counter indicator
-        if (fscanf(file, "%zu", numEntries) != 1) {
+        if (fscanf(file, "%lu", numEntries) != 1) {
             // Error handling for invalid or missing counter indicator
             fclose(file);
             return NULL;
@@ -66,11 +68,6 @@ user* readStructFromFile(char* filename, size_t* numEntries) {
 
         // Skip the newline character after the counter indicator
         fgetc(file);
-
-        if (*numEntries == 0) {
-            fclose(file);
-            return NULL; // No entries in the file
-        }
 
         // Allocate memory for the users
         user* data = (user*)malloc(*numEntries * sizeof(user));
@@ -83,7 +80,8 @@ user* readStructFromFile(char* filename, size_t* numEntries) {
         fclose(file);
         return data;
     } else {
-        return NULL; // Return NULL if file cannot be opened
+        *numEntries = 0;
+        return NULL; 
     }
 }
 
@@ -96,18 +94,79 @@ void listUsers(user* data, size_t numEntries) {
     }
 }
 
-void logUser(int sockid, int userid) {
+void viewContactAll(int sockid){
+    size_t numEntries = 0;
+    user* data = readStructFromFile("users.txt", &numEntries);
+    char buffer[BUFFER_SIZE];
+
+    if(numEntries == 0)
+        send_message(sockid, "Kayitli Kullanici Yok.");
+    else{
+        snprintf(buffer, BUFFER_SIZE, "%d", numEntries);
+        send_message(sockid, buffer);
+    }
     int i;
+
+    
+}
+
+void initializeFileSystem(int userid) {
+        // Create user directory
+        char user_directory[10];
+        sprintf(user_directory, "data/%d", userid);
+        
+        /*
+        char user_directory[10];
+        char messages_directory[40];
+        char contacts_file[40];
+        sprintf(user_directory, "data/%d", userid);
+        sprintf(messages_directory, "%s/messages", user_directory);
+        sprintf(contacts_file, "%s/contacts.txt", user_directory);
+        */
+
+        // Check if the directory already exists, if not, create it
+        struct stat st = {0};
+        if (stat(user_directory, &st) == -1) {
+            if (mkdir(user_directory, 0777) != 0) {
+                fprintf(stderr, "Error creating user directory for user_id %d\n", userid);
+                // Handle error as needed
+            }
+        }
+
+        // Create messages directory
+        char messages_directory[40];
+        sprintf(messages_directory, "%s/messages", user_directory);
+        if (stat(messages_directory, &st) == -1) {
+            if (mkdir(messages_directory, 0777) != 0) {
+                fprintf(stderr, "Error creating messages directory for userid %d\n", userid);
+                // Handle error as needed
+            }
+        }
+
+        // Create contacts file
+        char contacts_file[40];
+        sprintf(contacts_file, "%s/contacts.txt", user_directory);
+        FILE* file = fopen(contacts_file, "a");  // Open for append
+        if (file == NULL) {
+            fprintf(stderr, "Error creating contacts file for userid %d\n", userid);
+            // Handle error as needed
+        }
+        fclose(file);
+}
+
+void logUser(int sockid, int userid) {
+    
     size_t numEntries = 0;
     user* data = readStructFromFile("users.txt", &numEntries);
     char buffer[BUFFER_SIZE];
 
     // Check if there is any user with this ID
     int found = 0;
-    if(data != NULL){
-        while(found == 0 && i < numEntries) {
+    int i = 0;
+    if (data != NULL) {
+        while (found == 0 && i < numEntries) {
             if (data[i].userid == userid) {
-                // User found, send user info to client
+                // User found, send user info to the client
                 char response[BUFFER_SIZE];
                 snprintf(response, sizeof(response), "%s, %s, %d",
                         data[i].name, data[i].phone, data[i].userid);
@@ -118,25 +177,34 @@ void logUser(int sockid, int userid) {
             i++;
         }
     }
-    else
-        data = (user*)malloc((numEntries + 1) * sizeof(user));
 
     // If the user is not found, ask the client to register
     if (!found) {
         send_message(sockid, "/register");
         bzero(buffer, BUFFER_SIZE);
         receive_message(sockid, buffer, BUFFER_SIZE);
-        sscanf(buffer, "%[^,], %[^,], %d", data[numEntries].name, data[numEntries].phone, &data[numEntries].userid);
         
+        // Reallocate memory for one more user
+        user* temp = realloc(data, (numEntries + 1) * sizeof(user));
+        if (temp == NULL) {
+            fprintf(stderr, "Error reallocating memory.\n");
+            free(data);  // Free original data before exiting
+            exit(EXIT_FAILURE);
+        }
+        data = temp;
+
+        sscanf(buffer, "%[^,], %[^,], %d", data[numEntries].name, data[numEntries].phone, &data[numEntries].userid);
+
         // Update the number of entries
         numEntries++;
 
-        // Save the updated user data to the file (you need to implement this)
+        // Save the updated user data to the file
         writeStructToFile("users.txt", data, numEntries);
+        initializeFileSystem(userid);
 
         char response[BUFFER_SIZE];
         snprintf(response, sizeof(response), "%d, %s, %s",
-                data[i].userid, data[i].name, data[i].phone);
+                data[numEntries - 1].userid, data[numEntries - 1].name, data[numEntries - 1].phone);
         send_message(sockid, response);
         printf("Registered %d\n", userid);
     }
@@ -144,6 +212,8 @@ void logUser(int sockid, int userid) {
     // Free allocated memory for user data
     free(data);
 }
+
+
 
 void *handle_client(void *arg) {
     int socket_fd = *((int *)arg);

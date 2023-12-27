@@ -2,21 +2,21 @@
 
 File System
 
-> server
-> client
+- server
+- client
 
-> users.txt
+- users.txt
 
-> data
-    > user_id0
-        > messages
-            > user_id1.txt
-            > user_id2.txt
-            > user_id3.txt
-        > contacts.txt
-    > user_id2
-        > messages
-            > user_id1.txt
-            > user_id2.txt
-            > user_id3.txt
-        > contacts.txt
+- data
+    - user_id0
+        - messages
+            - user_id1.txt
+            - user_id2.txt
+            - user_id3.txt
+        - contacts.txt
+    - user_id2
+        - messages
+            - user_id1.txt
+            - user_id2.txt
+            - user_id3.txt
+        - contacts.txt

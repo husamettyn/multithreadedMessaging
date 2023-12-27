@@ -35,6 +35,21 @@ void send_message(int sockfd, char* message) {
     send(sockfd, message, strlen(message), 0);
 }
 
+void viewContactAll(int sockid){
+    char buffer[BUFFER_SIZE];
+    receive_message(sockid, buffer, BUFFER_SIZE);
+
+    if(strcmp(buffer, "Kayitli Kullanici Yok.") == 0){
+        printf("Kayitli Kullanici Yok.\n");
+    }
+    else{
+        int numEntries = atoi(buffer);
+    }
+    int i;
+    
+    
+}
+
 void display_menu(user myUser) {
 
     system("clear");
@@ -50,14 +65,14 @@ void display_menu(user myUser) {
     printf("Enter your choice: ");
 }
 
-void init_main(user myData, int sockid){
+void init_main(user myUser, int sockid){
     char buffer[BUFFER_SIZE];
 
     while (1){
         bzero(buffer, BUFFER_SIZE);
         int choice;
 
-        display_menu(myData);
+        display_menu(myUser);
         scanf("%d", &choice);
         switch (choice) {
             case 1:
@@ -79,7 +94,7 @@ void init_main(user myData, int sockid){
                 // Delete message
                 break;
             case 7:
-                snprintf(buffer, sizeof(buffer), "/exit %d", myData.userid);
+                snprintf(buffer, sizeof(buffer), "/exit %d", myUser.userid);
                 send_message(sockid, buffer);
                 exit(0);
                 break;
@@ -105,25 +120,26 @@ void login_to_server(int sockid, int userid){
     receive_message(sockid, buffer, BUFFER_SIZE);
 
     if (strcmp(buffer, "/register") == 0){
+        user myData;
         char name[40];
         char phone[20];
 
         printf("Your Name: ");
-        scanf(" %[^\n]", name);
+        scanf(" %[^\n]", myData.name);
         getchar();
 
         printf("Your Phone: ");
-        scanf("%s", phone);
+        scanf("%s", myData.phone);
         getchar();
+        myData.userid = userid;
 
         char userString[BUFFER_SIZE];
-        snprintf(userString, sizeof(userString), "%s, %s, %d", name, phone, userid);
+        snprintf(userString, sizeof(userString), "%s, %s, %d", myData.name, myData.phone, userid);
 
         // Send the user data to the server
         send_message(sockid, userString);
 
-        receive_message(sockid, buffer, BUFFER_SIZE);
-        login_to_server(sockid, userid);
+        init_main(myData, sockid);
     }
     else{
         user myData;
@@ -173,7 +189,6 @@ int main(int argc, char* argv[]){
         fprintf(stderr,"usage %s userid\n", argv[0]);
         exit(0);
     }
-    
 
     connect_server(atoi(argv[1]));
 	
