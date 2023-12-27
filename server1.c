@@ -8,6 +8,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <asm-generic/socket.h>
 
 #define PORT 8080
 #define BUFFER_SIZE 1024
@@ -231,25 +232,6 @@ int main() {
 }
 
 /*
-server
-client
-
-users.txt
-
-data
-    > user_id0
-        > messages
-            > user_id1.txt
-            > user_id2.txt
-            > user_id3.txt
-        > contacts.txt
-    > user_id2
-        > messages
-            > user_id1.txt
-            > user_id2.txt
-            > user_id3.txt
-        > contacts.txt
-
 
 snprintf(buffer, BUFFER_SIZE, "%s, %s, %d", name, phone, userid);
 sscanf(buffer, "%[^,], %[^,], %d", myData.name, myData.phone, &myData.userid);
