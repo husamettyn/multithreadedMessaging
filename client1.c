@@ -26,9 +26,9 @@ typedef struct{
 
 void display_menu(user myUser) {
     int i;
-    for (i = 0; i < 2; ++i) {
+    for (i = 0; i < 3; ++i) {
         usleep(500000);  // Sleep for 0.5 seconds (500,000 microseconds)
-        printf("|||");
+        printf("---");
         fflush(stdout);  // Flush the output buffer
     }
     system("clear");
@@ -66,7 +66,8 @@ void receive_message(int client_sockfd, char* buffer) {
 
 void send_message(int sockfd, char* message) {
     //printf("This Side: %s\n", message);
-    send(sockfd, message, strlen(message), 0);
+    if(strlen(message) >= 1)
+        send(sockfd, message, strlen(message), 0);
 }
 
 user* recvContact(int sockid, int* num, int userid){
@@ -105,22 +106,33 @@ user* recvContact(int sockid, int* num, int userid){
     return data;
 }
 
-void addContact(int sockid){
+void addDeleteContact(int sockid, char* process, int userid){
     char buffer[BUFFER_SIZE];
 
     int numEntries = 0;
-    snprintf(buffer, sizeof(buffer), "/addContact");
+    snprintf(buffer, sizeof(buffer), "%s", process);
     send_message(sockid, buffer);
 
     do{
         receive_message(sockid, buffer);
     }while (strcmp(buffer, "/ok") != 0);
 
-    user* allContacts = recvContact(sockid, &numEntries, -1);
+    user* allContacts = recvContact(sockid, &numEntries, userid);
     
-    displayContact(allContacts, numEntries);
+    if(allContacts != NULL){
+        displayContact(allContacts, numEntries);
+        printf("\nDevam Etmek Icin Bir Tusa Basiniz.\n");
+        fflush(stdout);
+        getchar();
+        getchar();
+    }
+    else{
+        printf("\nRehberiniz bos.\n\n");
+        fflush(stdout);
+        
+    }
 
-    printf("ID of User: ");
+    printf("%s\nID of User: ", process);
     scanf("%s", buffer);
 
     send_message(sockid, buffer);
@@ -153,8 +165,8 @@ void listContacts(int sockid, int userid){
         printf("\nRehberiniz bos.\n\n");
         fflush(stdout);
     }
-
 }
+
 
 void init_main(user myUser, int sockid){
     //int myNumEntries = 0;
@@ -175,10 +187,11 @@ void init_main(user myUser, int sockid){
                 listContacts(sockid, myUser.userid);
                 break;
             case 2:
-                addContact(sockid);
+                addDeleteContact(sockid, "/addContact", -1);
 
                 break;
             case 3:
+                addDeleteContact(sockid, "/deleteContact", myUser.userid);
                 // Delete contact
                 break;
             case 4:

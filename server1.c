@@ -42,7 +42,8 @@ void receive_message(int client_sockfd, char* buffer) {
 
 int send_message(int sockfd, char* message) {
     //printf("This Side: %s\n", message);
-    return send(sockfd, message, strlen(message), 0);
+    if(strlen(message) >= 1)
+        send(sockfd, message, strlen(message), 0);
 }
 
 void writeStructToFile(char* filename, user* data, int numEntries) {
@@ -329,13 +330,76 @@ void addContact(int sockid, int userid){
     return;
 }
 
-void listContacts(int sockid){
+void deleteContact(int sockid, int userid){
     char buffer[BUFFER_SIZE];
     
     send_message(sockid, "/ok");
-    
     sendContact(sockid);
 
+    do{
+        receive_message(sockid, buffer);
+    }while (strlen(buffer) == 0);
+
+    int addUser = atoi(buffer);
+
+    // if client wants to add himself
+    if(addUser == userid){
+        send_message(sockid, "You can't delete yourself\n");
+        return;
+    }
+
+    char filename[40];
+    sprintf(filename, "data/%d/contacts.txt", userid);
+
+    size_t numEntries = 0;
+    int i=0;
+    user* data = readStructFromFile(filename, &numEntries);
+    user newUser;
+    
+    // son eleman kalınca hepsini silmek lazım
+    // ama 
+
+    while(data != NULL && i < numEntries){
+        if(data[i].userid == addUser){
+            int j;
+            numEntries--;
+            if(numEntries != 0){
+                for(j = i; j<numEntries; j++){
+                    strcpy(data[j].name, data[j+1].name);
+                    strcpy(data[j].phone, data[j+1].phone);
+                    data[j].userid = data[j+1].userid;
+                }
+                user* temp = realloc(data, (numEntries) * sizeof(user));
+
+                if (temp == NULL) {
+                    fprintf(stderr, "Error reallocating memory.\n");
+                    free(data);  // Free original data before exiting
+                    exit(EXIT_FAILURE);
+                }
+                data = temp;
+
+            writeStructToFile(filename, data, numEntries);
+            }
+            else{
+                FILE* file = fopen(filename, "w"); // Open the file for writing (overwrite mode)
+                if (file != NULL)
+                    // Write the counter indicator
+                    fprintf(file, "%s", "");
+            }
+
+            send_message(sockid, "Kullanici Silindi.\n");
+            return;
+        }
+        i++;
+    }
+    send_message(sockid, "Kullanici Bulunamadi.\n");
+
+}
+
+void listContacts(int sockid){
+    char buffer[BUFFER_SIZE];
+    send_message(sockid, "/ok");
+    sendContact(sockid);
 }
 
 void *handle_client(void *arg) {
@@ -365,6 +429,9 @@ void *handle_client(void *arg) {
         }
         else if (strcmp(buffer, "/addContact") == 0){
             addContact(sockid, user_id);
+        }
+        else if (strcmp(buffer, "/deleteContact") == 0){
+            deleteContact(sockid, user_id);
         }
         else if (strcmp(buffer, "/listContacts") == 0){
             listContacts(sockid);
