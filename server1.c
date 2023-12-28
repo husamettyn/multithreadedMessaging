@@ -17,16 +17,17 @@
 typedef struct{
 	int userid;
 	char phone[20];
-	char name[40];
+	char name[20];
+    char surname[20];
 } user;
 
 void displayContact(user* data, int numEntries) {
     int i;
-    printf("| %-10s| %-20s| %-40s\n", "User ID", "Phone", "Name");
+    printf("| %-10s| %-20s| %-20s| %-20s\n", "User ID", "Phone", "Name", "Surname");
     printf("|──────────────────────────────────────────────────────\n");
 
     for (i = 0; i < numEntries; ++i) {
-        printf("| %-10d| %-20s| %-40s\n", data[i].userid, data[i].phone, data[i].name);
+        printf("| %-10d| %-20s| %-20s| %-20s\n", data[i].userid, data[i].phone, data[i].name, data[i].surname);
         if (i < numEntries - 1) {
             printf("|───────────|─────────────────────|────────────────────\n");
         }
@@ -57,7 +58,7 @@ void writeStructToFile(char* filename, user* data, int numEntries) {
 
         // Write each user to the file
         for (i = 0; i < numEntries; ++i) {
-            int result = fprintf(file, "%d, %s, %s;\n", data[i].userid, data[i].phone, data[i].name);
+            int result = fprintf(file, "%d, %s, %s, %s;\n", data[i].userid, data[i].phone, data[i].name, data[i].surname);
 
             // Check if writing was successful
             if (result < 0) {
@@ -91,17 +92,18 @@ user* readStructFromFile(char* filename, size_t* numEntries) {
 
         // Read each user from the file
         for (i = 0; i < *numEntries; ++i) {
-            fscanf(file, "%d, %19[^,], %39[^;\n]%*[; \t\n]", &data[i].userid, data[i].phone, data[i].name);
+            fscanf(file, "%d, %19[^,], %19[^,], %19[^;\n]%*[; \t\n]",
+                &data[i].userid, data[i].phone, data[i].name, data[i].surname);
         }
 
         fclose(file);
         return data;
     } else {
         *numEntries = 0;
-        fclose(file);
-        return NULL; 
+        return NULL;
     }
 }
+
 
 void sendContact(int sockid){
     char buffer[BUFFER_SIZE];
@@ -141,8 +143,8 @@ void sendContact(int sockid){
             char buffer2[BUFFER_SIZE];
             memset(buffer, '\0', BUFFER_SIZE);
             memset(buffer2, '\0', BUFFER_SIZE);
-            snprintf(buffer, BUFFER_SIZE, "%s, %s, %d", data[i].name, data[i].phone, data[i].userid);
-            printf("%s, %s, %d\n", data[i].name, data[i].phone, data[i].userid);
+            snprintf(buffer, BUFFER_SIZE, "%s, %s, %s, %d", data[i].name, data[i].surname, data[i].phone, data[i].userid);
+            printf("%s, %s, %s, %d\n", data[i].name, data[i].surname, data[i].phone, data[i].userid);
             do{
                 send_message(sockid, buffer);
 
@@ -157,47 +159,57 @@ void sendContact(int sockid){
 }
 
 void initializeFileSystem(int userid) {
-        // Create user directory
-        char user_directory[10];
-        sprintf(user_directory, "data/%d", userid);
-        
-        /*
-        char user_directory[10];
-        char messages_directory[40];
-        char contacts_file[40];
-        sprintf(user_directory, "data/%d", userid);
-        sprintf(messages_directory, "%s/messages", user_directory);
-        sprintf(contacts_file, "%s/contacts.txt", user_directory);
-        */
+    // Create user directory
 
-        // Check if the directory already exists, if not, create it
-        struct stat st = {0};
-        if (stat(user_directory, &st) == -1) {
-            if (mkdir(user_directory, 0777) != 0) {
-                fprintf(stderr, "Error creating user directory for user_id %d\n", userid);
-                // Handle error as needed
-            }
-        }
-
-        // Create messages directory
-        char messages_directory[40];
-        sprintf(messages_directory, "%s/messages", user_directory);
-        if (stat(messages_directory, &st) == -1) {
-            if (mkdir(messages_directory, 0777) != 0) {
-                fprintf(stderr, "Error creating messages directory for userid %d\n", userid);
-                // Handle error as needed
-            }
-        }
-
-        // Create contacts file
-        char contacts_file[40];
-        sprintf(contacts_file, "%s/contacts.txt", user_directory);
-        FILE* file = fopen(contacts_file, "a");  // Open for append
-        if (file == NULL) {
-            fprintf(stderr, "Error creating contacts file for userid %d\n", userid);
+    char data_directory[] = "data";
+    struct stat st_data = {0};
+    if (stat(data_directory, &st_data) == -1) {
+        if (mkdir(data_directory, 0777) != 0) {
+            fprintf(stderr, "Error creating data directory\n");
             // Handle error as needed
         }
-        fclose(file);
+    }
+
+    char user_directory[10];
+    sprintf(user_directory, "data/%d", userid);
+    
+    /*
+    char user_directory[10];
+    char messages_directory[40];
+    char contacts_file[40];
+    sprintf(user_directory, "data/%d", userid);
+    sprintf(messages_directory, "%s/messages", user_directory);
+    sprintf(contacts_file, "%s/contacts.txt", user_directory);
+    */
+
+    // Check if the directory already exists, if not, create it
+    struct stat st = {0};
+    if (stat(user_directory, &st) == -1) {
+        if (mkdir(user_directory, 0777) != 0) {
+            fprintf(stderr, "Error creating user directory for user_id %d\n", userid);
+            // Handle error as needed
+        }
+    }
+
+    // Create messages directory
+    char messages_directory[40];
+    sprintf(messages_directory, "%s/messages", user_directory);
+    if (stat(messages_directory, &st) == -1) {
+        if (mkdir(messages_directory, 0777) != 0) {
+            fprintf(stderr, "Error creating messages directory for userid %d\n", userid);
+            // Handle error as needed
+        }
+    }
+
+    // Create contacts file
+    char contacts_file[40];
+    sprintf(contacts_file, "%s/contacts.txt", user_directory);
+    FILE* file = fopen(contacts_file, "a");  // Open for append
+    if (file == NULL) {
+        fprintf(stderr, "Error creating contacts file for userid %d\n", userid);
+        // Handle error as needed
+    }
+    fclose(file);
 }
 
 void logUser(int sockid, int userid) {
@@ -214,8 +226,7 @@ void logUser(int sockid, int userid) {
             if (data[i].userid == userid) {
                 // User found, send user info to the client
                 char response[BUFFER_SIZE];
-                snprintf(response, sizeof(response), "%s, %s, %d",
-                        data[i].name, data[i].phone, data[i].userid);
+                snprintf(response, BUFFER_SIZE, "%s, %s, %s, %d", data[i].name, data[i].surname, data[i].phone, data[i].userid);
                 send_message(sockid, response);
                 found = 1;
                 printf("Logged in %d\n", userid);
@@ -239,7 +250,7 @@ void logUser(int sockid, int userid) {
         }
         data = temp;
 
-        sscanf(buffer, "%[^,], %[^,], %d", data[numEntries].name, data[numEntries].phone, &data[numEntries].userid);
+        sscanf(buffer, "%[^,], %[^,], %[^,], %d", data[numEntries].name, data[numEntries].surname, data[numEntries].phone, &data[numEntries].userid);
 
         // Update the number of entries
         numEntries++;
@@ -249,8 +260,8 @@ void logUser(int sockid, int userid) {
         initializeFileSystem(userid);
 
         char response[BUFFER_SIZE];
-        snprintf(response, sizeof(response), "%d, %s, %s",
-                data[numEntries - 1].userid, data[numEntries - 1].name, data[numEntries - 1].phone);
+        snprintf(response, sizeof(response), "%d, %s, %s, %s",
+                data[numEntries - 1].userid, data[numEntries - 1].name, data[numEntries - 1].surname, data[numEntries - 1].phone);
         send_message(sockid, response);
         printf("Registered %d\n", userid);
     }
@@ -312,9 +323,10 @@ void addContact(int sockid, int userid){
             data = temp;
 
             strcpy(data[numEntries].name, contactList[i].name);
+            strcpy(data[numEntries].surname, contactList[i].surname);
             strcpy(data[numEntries].phone, contactList[i].phone);
             data[numEntries].userid = addUser;
-            printf("%s, %s, %d\n", data[numEntries].name, data[numEntries].phone, data[numEntries].userid);
+            printf("%s, %s, %s, %d\n", data[numEntries].name, data[numEntries].surname, data[numEntries].phone, data[numEntries].userid);
             // Update the number of entries
             numEntries++;
 
@@ -369,6 +381,7 @@ void deleteContact(int sockid, int userid){
             if(numEntries != 0){
                 for(j = i; j<numEntries; j++){
                     strcpy(data[j].name, data[j+1].name);
+                    strcpy(data[j].surname, data[j+1].surname);
                     strcpy(data[j].phone, data[j+1].phone);
                     data[j].userid = data[j+1].userid;
                 }

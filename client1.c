@@ -21,7 +21,8 @@
 typedef struct{
 	int userid;
 	char phone[20];
-	char name[40];
+	char name[20];
+    char surname[20];
 } user;
 
 void display_menu(user myUser) {
@@ -33,7 +34,7 @@ void display_menu(user myUser) {
     }
     system("clear");
     printf(" User Info\n");
-    printf(" %d - %s - %s\n\n", myUser.userid, myUser.name, myUser.phone);
+    printf(" %d - %s - %s - %s\n\n", myUser.userid, myUser.name,myUser.surname, myUser.phone);
     printf("- 1. List contacts\n");
     printf("- 2. Add contact\n");
     printf("- 3. Delete contact\n");
@@ -46,11 +47,11 @@ void display_menu(user myUser) {
 
 void displayContact(user* data, int numEntries) {
     int i;
-    printf("| %-10s| %-20s| %-40s\n", "User ID", "Phone", "Name");
+    printf("| %-10s| %-20s| %-20s| %-20s\n", "User ID", "Phone", "Name", "Surname");
     printf("|──────────────────────────────────────────────────────\n");
 
     for (i = 0; i < numEntries; ++i) {
-        printf("| %-10d| %-20s| %-40s\n", data[i].userid, data[i].phone, data[i].name);
+        printf("| %-10d| %-20s| %-20s| %-20s\n", data[i].userid, data[i].phone, data[i].name, data[i].surname);
         if (i < numEntries - 1) {
             printf("|───────────|─────────────────────|────────────────────\n");
         }
@@ -97,7 +98,7 @@ user* recvContact(int sockid, int* num, int userid){
     for(i=0; i<numEntries; i++){
         memset(buffer, '\0', BUFFER_SIZE);
         receive_message(sockid, buffer);
-        sscanf(buffer, "%[^,], %[^,], %d", data[i].name, data[i].phone, &data[i].userid);
+        sscanf(buffer, "%[^,], %[^,], %[^,], %d", data[i].name, data[i].surname, data[i].phone, &data[i].userid);
         //printf("%s, %s %d\n", data[i].name, data[i].phone, data[i].userid);
         send_message(sockid, "received");
     }
@@ -263,11 +264,16 @@ void login_to_server(int sockid, int userid){
 
     if (strcmp(buffer, "/register") == 0){
         user myData;
-        char name[40];
+        char name[20];
+        char surname[20];
         char phone[20];
 
         printf("Your Name: ");
         scanf(" %[^\n]", myData.name);
+        getchar();
+
+        printf("Your Surname: ");
+        scanf(" %[^\n]", myData.surname);
         getchar();
 
         printf("Your Phone: ");
@@ -276,7 +282,7 @@ void login_to_server(int sockid, int userid){
         myData.userid = userid;
 
         char userString[BUFFER_SIZE];
-        snprintf(userString, sizeof(userString), "%s, %s, %d", myData.name, myData.phone, userid);
+        snprintf(userString, sizeof(userString), "%s, %s, %s, %d", myData.name, myData.surname, myData.phone, userid);
 
         // Send the user data to the server
         send_message(sockid, userString);
@@ -285,7 +291,7 @@ void login_to_server(int sockid, int userid){
     }
     else{
         user myData;
-        sscanf(buffer, "%[^,], %[^,], %d", myData.name, myData.phone, &myData.userid);
+        sscanf(buffer, "%[^,], %[^,], %[^,], %d", myData.name, myData.surname, myData.phone, &myData.userid);
         
         init_main(myData, sockid);
     }
