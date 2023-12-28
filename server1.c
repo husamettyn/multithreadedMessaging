@@ -57,7 +57,7 @@ void getCurrentDateTime(char* dateTimeString, int maxLength) {
     tmInfo = localtime(&t);
 
     // Tarih ve saat bilgilerini biçimlendirip dateTimeString'e yerleştir
-    snprintf(dateTimeString, maxLength, "%02d:%02d | %02d-%02d-%04d",
+    snprintf(dateTimeString, maxLength, "%02d:%02d %02d-%02d-%04d",
              tmInfo->tm_hour, tmInfo->tm_min,
              tmInfo->tm_mday, tmInfo->tm_mon + 1, tmInfo->tm_year + 1900);
 }
@@ -437,6 +437,7 @@ void appendMessage(const char *filename, const char *message) {
 
     fclose(file); // Close the file
 }
+
 void sendMessage(int sockid, int userid){
     char buffer[BUFFER_SIZE];
     send_message(sockid, "/ok");
@@ -448,7 +449,6 @@ void sendMessage(int sockid, int userid){
         return;
     }
     else{
-        printf("inside1\n");
         int i;
         size_t numEntries;
         char message[BUFFER_SIZE-100];
@@ -461,11 +461,9 @@ void sendMessage(int sockid, int userid){
         char destMsg[BUFFER_SIZE];
 
         sscanf(buffer, "%d, %[^\n]", &destid, message);
-        printf("d: %d - s: %s\n", destid, message);
 
         user* data = readStructFromFile("users.txt", &numEntries);
         user destUser, sourceUser;
-        printf("inside2\n");
         for (i = 0; i < numEntries; i++){
             if(data[i].userid == userid){
                 sourceUser = data[i];
@@ -476,24 +474,22 @@ void sendMessage(int sockid, int userid){
         }
         getCurrentDateTime(date, 20);
 
-        printf("inside3\n");
+        // mesaj atan kullanıcının dosyasına sen ile başlayacak şekilde
+        // yerleştirir.
         sprintf(sourceMsg, "%s | %-15s: %s", date, "Sen", message);
-        sprintf(filename, "%d.txt", destid);
-        sprintf(msg_directory, "data/%d/messages/%s", userid, filename);
-
-        printf("dir: %s | msg: %s\n", msg_directory, sourceMsg);
+        sprintf(msg_directory, "data/%d/messages/%d.txt", userid, destid);
         appendMessage(msg_directory, sourceMsg);
 
-        printf("inside4\n");
-
         sprintf(destMsg, "%s | %-15s: %s", date, sourceUser.name, message);
-        sprintf(filename, "%d.txt", userid);
-        sprintf(msg_directory, "data/%d/messages/%s", destid, filename);
-
-        printf("dir: %s | msg: %s\n", msg_directory, destMsg);
-
+        sprintf(msg_directory, "data/%d/messages/%d.txt", destid, userid);
         appendMessage(msg_directory, destMsg);
+
+        sprintf(destMsg, "(Yeni Mesaj!) %s %s %d", sourceUser.name, sourceUser.surname, sourceUser.userid);
+        sprintf(msg_directory, "data/%d/messages/newMessages.txt", destid);
+        appendMessage(msg_directory, destMsg);
+
         send_message(sockid, "/ok");
+
     }
 }
 

@@ -44,8 +44,8 @@ void display_menu(user myUser) {
         fflush(stdout);  // Flush the output buffer
     }
     system("clear");
-    printf(" User Info\n");
-    printf(" %d - %s - %s - %s\n\n", myUser.userid, myUser.name,myUser.surname, myUser.phone);
+    printf(" Welcome %s %s\n", myUser.name, myUser.surname);
+    printf(" %d - %s\n\n", myUser.userid, myUser.phone);
     printf("- 1. List contacts\n");
     printf("- 2. Add contact\n");
     printf("- 3. Delete contact\n");
