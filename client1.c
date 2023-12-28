@@ -25,11 +25,16 @@ typedef struct{
 } user;
 
 void display_menu(user myUser) {
-
+    int i;
+    for (i = 0; i < 2; ++i) {
+        usleep(500000);  // Sleep for 0.5 seconds (500,000 microseconds)
+        printf("|||");
+        fflush(stdout);  // Flush the output buffer
+    }
     system("clear");
     printf(" User Info\n");
     printf(" %d - %s - %s\n\n", myUser.userid, myUser.name, myUser.phone);
-    printf("- 1. Display contacts\n");
+    printf("- 1. List contacts\n");
     printf("- 2. Add contact\n");
     printf("- 3. Delete contact\n");
     printf("- 4. Check messages\n");
@@ -41,25 +46,26 @@ void display_menu(user myUser) {
 
 void displayContact(user* data, int numEntries) {
     int i;
-    printf("%-10s|%-20s|%-40s\n", "User ID", "Phone", "Name");
-    printf("--------------------------------------------\n");
+    printf("| %-10s| %-20s| %-40s\n", "User ID", "Phone", "Name");
+    printf("|──────────────────────────────────────────────────────\n");
 
     for (i = 0; i < numEntries; ++i) {
-        printf("%-10d|%-20s|%-40s\n", data[i].userid, data[i].phone, data[i].name);
+        printf("| %-10d| %-20s| %-40s\n", data[i].userid, data[i].phone, data[i].name);
         if (i < numEntries - 1) {
-            printf("|──────────|────────────────────|----------------------------------------\n");
+            printf("|───────────|─────────────────────|────────────────────\n");
         }
     }
+    printf("|──────────────────────────────────────────────────────\n");
 }
 
-void receive_message(int client_sockfd, char* buffer, size_t buffsize) {
-    bzero(buffer, BUFFER_SIZE);
-    read(client_sockfd, buffer, buffsize - 1);
+void receive_message(int client_sockfd, char* buffer) {
+    memset(buffer, '\0', BUFFER_SIZE);
+    read(client_sockfd, buffer, BUFFER_SIZE - 1);
     //printf("Server Side: %s\n", buffer);
 }
 
 void send_message(int sockfd, char* message) {
-    //printf("Client Side: %s\n", message);
+    //printf("This Side: %s\n", message);
     send(sockfd, message, strlen(message), 0);
 }
 
@@ -67,11 +73,11 @@ user* recvContact(int sockid, int* num, int userid){
     
     int numEntries;
     char buffer[BUFFER_SIZE];
-    bzero(buffer, BUFFER_SIZE);
+    memset(buffer, '\0', BUFFER_SIZE);
     sprintf(buffer, "/recvContact %d", userid);
     send_message(sockid, buffer);
 
-    receive_message(sockid, buffer, BUFFER_SIZE);
+    receive_message(sockid, buffer);
     
     user* data;
 
@@ -89,16 +95,66 @@ user* recvContact(int sockid, int* num, int userid){
     send_message(sockid, buffer);
     int i;
     for(i=0; i<numEntries; i++){
-        bzero(buffer, BUFFER_SIZE);
-        receive_message(sockid, buffer, BUFFER_SIZE);
+        memset(buffer, '\0', BUFFER_SIZE);
+        receive_message(sockid, buffer);
         sscanf(buffer, "%[^,], %[^,], %d", data[i].name, data[i].phone, &data[i].userid);
-        printf("%s, %s %d\n", data[i].name, data[i].phone, data[i].userid);
+        //printf("%s, %s %d\n", data[i].name, data[i].phone, data[i].userid);
         send_message(sockid, "received");
     }
     
     return data;
 }
 
+void addContact(int sockid){
+    char buffer[BUFFER_SIZE];
+
+    int numEntries = 0;
+    snprintf(buffer, sizeof(buffer), "/addContact");
+    send_message(sockid, buffer);
+
+    do{
+        receive_message(sockid, buffer);
+    }while (strcmp(buffer, "/ok") != 0);
+
+    user* allContacts = recvContact(sockid, &numEntries, -1);
+    
+    displayContact(allContacts, numEntries);
+
+    printf("ID of User: ");
+    scanf("%s", buffer);
+
+    send_message(sockid, buffer);
+
+    receive_message(sockid, buffer);
+    printf("%s", buffer);
+}
+
+void listContacts(int sockid, int userid){
+    char buffer[BUFFER_SIZE];
+
+    int numEntries = 0;
+    snprintf(buffer, sizeof(buffer), "/listContacts");
+    send_message(sockid, buffer);
+
+    do{
+        receive_message(sockid, buffer);
+    }while (strcmp(buffer, "/ok") != 0);
+
+    user* myContacts = recvContact(sockid, &numEntries, userid);
+    
+    if(myContacts != NULL){
+        displayContact(myContacts, numEntries);
+        printf("\nDevam Etmek Icin Bir Tusa Basiniz.\n");
+        fflush(stdout);
+        getchar();
+        getchar();
+    }
+    else{
+        printf("\nRehberiniz bos.\n\n");
+        fflush(stdout);
+    }
+
+}
 
 void init_main(user myUser, int sockid){
     //int myNumEntries = 0;
@@ -112,17 +168,14 @@ void init_main(user myUser, int sockid){
         display_menu(myUser);
         
         scanf("%d", &choice);
+
         switch (choice) {
             case 1:
                 // Display contacts
+                listContacts(sockid, myUser.userid);
                 break;
             case 2:
-                int numEntries = 0;
-                snprintf(buffer, sizeof(buffer), "/addContact");
-                send_message(sockid, buffer);
-                
-                user* allContacts = recvContact(sockid, &numEntries, -1);
-                displayContact(allContacts, numEntries);
+                addContact(sockid);
 
                 break;
             case 3:
@@ -140,6 +193,7 @@ void init_main(user myUser, int sockid){
             case 7:
                 snprintf(buffer, sizeof(buffer), "/exit %d", myUser.userid);
                 send_message(sockid, buffer);
+                exit(0);
                 break;
             default:
                 printf("Invalid choice");
@@ -152,15 +206,15 @@ void login_to_server(int sockid, int userid){
     
     // Allocate memory for the user data
     char buffer[BUFFER_SIZE];
-    bzero(buffer, BUFFER_SIZE);
+    memset(buffer, '\0', BUFFER_SIZE);
 
     snprintf(buffer, sizeof(buffer), "/login %d", userid);
 
     // Send the login message to the server
     send_message(sockid, buffer);
 
-    bzero(buffer, BUFFER_SIZE);
-    receive_message(sockid, buffer, BUFFER_SIZE);
+    memset(buffer, '\0', BUFFER_SIZE);
+    receive_message(sockid, buffer);
 
     if (strcmp(buffer, "/register") == 0){
         user myData;

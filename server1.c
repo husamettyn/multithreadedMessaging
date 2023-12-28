@@ -20,12 +20,28 @@ typedef struct{
 	char name[40];
 } user;
 
-void receive_message(int client_sockfd, char* buffer, size_t buffsize) {
-    bzero(buffer, buffsize);
-    read(client_sockfd, buffer, buffsize - 1);
+void displayContact(user* data, int numEntries) {
+    int i;
+    printf("| %-10s| %-20s| %-40s\n", "User ID", "Phone", "Name");
+    printf("|──────────────────────────────────────────────────────\n");
+
+    for (i = 0; i < numEntries; ++i) {
+        printf("| %-10d| %-20s| %-40s\n", data[i].userid, data[i].phone, data[i].name);
+        if (i < numEntries - 1) {
+            printf("|───────────|─────────────────────|────────────────────\n");
+        }
+    }
+    printf("|──────────────────────────────────────────────────────\n");
+}
+
+void receive_message(int client_sockfd, char* buffer) {
+    memset(buffer, '\0', BUFFER_SIZE);
+    read(client_sockfd, buffer, BUFFER_SIZE - 1);
+    printf("Client Side: %s\n", buffer);
 }
 
 int send_message(int sockfd, char* message) {
+    //printf("This Side: %s\n", message);
     return send(sockfd, message, strlen(message), 0);
 }
 
@@ -81,13 +97,15 @@ user* readStructFromFile(char* filename, size_t* numEntries) {
         return data;
     } else {
         *numEntries = 0;
+        fclose(file);
         return NULL; 
     }
 }
 
 void sendContact(int sockid){
     char buffer[BUFFER_SIZE];
-    receive_message(sockid, buffer, BUFFER_SIZE);
+
+    receive_message(sockid, buffer);
 
     char* user_id_str = buffer + strlen("/recvContact");
     int userid = atoi(user_id_str);
@@ -113,19 +131,21 @@ void sendContact(int sockid){
     }
     int i;
 
-    receive_message(sockid, buffer, BUFFER_SIZE);
+    receive_message(sockid, buffer);
 
     if(strcmp(buffer, "/ready") == 0){
         for(i=0; i<numEntries; i++){
             char buffer2[BUFFER_SIZE];
-            bzero(buffer, BUFFER_SIZE);
-            bzero(buffer2, BUFFER_SIZE);
+            memset(buffer, '\0', BUFFER_SIZE);
+            memset(buffer2, '\0', BUFFER_SIZE);
             snprintf(buffer, BUFFER_SIZE, "%s, %s, %d", data[i].name, data[i].phone, data[i].userid);
+            printf("%s, %s, %d\n", data[i].name, data[i].phone, data[i].userid);
             do{
                 send_message(sockid, buffer);
-                receive_message(sockid, buffer2, BUFFER_SIZE);
+
+                receive_message(sockid, buffer2);
             }while(strcmp(buffer2, "received") != 0);
-            printf("%s\n", buffer);
+            //printf("%s\n", buffer);
         }
     }
 
@@ -204,8 +224,8 @@ void logUser(int sockid, int userid) {
     // If the user is not found, ask the client to register
     if (!found) {
         send_message(sockid, "/register");
-        bzero(buffer, BUFFER_SIZE);
-        receive_message(sockid, buffer, BUFFER_SIZE);
+        memset(buffer, '\0', BUFFER_SIZE);
+        receive_message(sockid, buffer);
         
         // Reallocate memory for one more user
         user* temp = realloc(data, (numEntries + 1) * sizeof(user));
@@ -236,24 +256,107 @@ void logUser(int sockid, int userid) {
     free(data);
 }
 
+void addContact(int sockid, int userid){
+    char buffer[BUFFER_SIZE];
+    
+    send_message(sockid, "/ok");
+    sendContact(sockid);
+
+    do{
+        receive_message(sockid, buffer);
+    }while (strlen(buffer) == 0);
+
+    int addUser = atoi(buffer);
+
+    // if client wants to add himself
+    if(addUser == userid){
+        send_message(sockid, "You can't add yourself\n");
+        return;
+    }
+
+    char filename[40];
+    sprintf(filename, "data/%d/contacts.txt", userid);
+
+    size_t totalUsers = 0, numEntries = 0;
+    int i=0, found=0;
+    user* contactList = readStructFromFile("users.txt", &totalUsers);
+    user* data = readStructFromFile(filename, &numEntries);
+    user newUser;
+
+    while(data != NULL && i < totalUsers){
+        if(data[i].userid == addUser){
+            send_message(sockid, "User already exists\n");
+            return;
+        }
+        i++;
+    }
+
+    i=0;
+    while(found == 0 && i < totalUsers){
+        if(data != NULL && data[i].userid == addUser){
+            return;
+        }
+        if(contactList[i].userid == addUser){
+            found = 1;
+
+            user* temp = realloc(data, (numEntries + 1) * sizeof(user));
+
+            if (temp == NULL) {
+                fprintf(stderr, "Error reallocating memory.\n");
+                free(data);  // Free original data before exiting
+                exit(EXIT_FAILURE);
+            }
+            data = temp;
+
+            strcpy(data[numEntries].name, contactList[i].name);
+            strcpy(data[numEntries].phone, contactList[i].phone);
+            data[numEntries].userid = addUser;
+            printf("%s, %s, %d\n", data[numEntries].name, data[numEntries].phone, data[numEntries].userid);
+            // Update the number of entries
+            numEntries++;
+
+            //displayContact(data, numEntries);
+
+            // Save the updated user data to the file
+            writeStructToFile(filename, data, numEntries);
+        }
+        i++;
+    }
+    if(found == 0)
+        send_message(sockid, "Failed to add\n");
+    else
+        send_message(sockid, "Added to contact\n");
+    return;
+}
+
+void listContacts(int sockid){
+    char buffer[BUFFER_SIZE];
+    
+    send_message(sockid, "/ok");
+    
+    sendContact(sockid);
+
+}
+
 void *handle_client(void *arg) {
     int sockid = *((int *)arg);
     char buffer[BUFFER_SIZE] = {0};
     int status = 1;
 
-    while (status) {
-        bzero(buffer, BUFFER_SIZE);
-        receive_message(sockid, buffer, BUFFER_SIZE);
-        if (strncmp(buffer, "/login", strlen("/login")) == 0) {
-            // Extract the user ID from the message
-            const char* user_id_str = buffer + strlen("/login"); // Skip the "/login" part
-            int user_id = atoi(user_id_str);
 
-            // Now you have the user ID, you can use it as needed
-            printf("User %d is trying to log in.\n", user_id);
-            logUser(sockid, user_id);
-        }
-        else if (strncmp(buffer, "/exit", strlen("/exit")) == 0){
+    receive_message(sockid, buffer);
+    const char* user_id_str = buffer + strlen("/login"); // Skip the "/login" part
+    int user_id = atoi(user_id_str);
+
+    // Now you have the user ID, you can use it as needed
+    printf("User %d is trying to log in.\n", user_id);
+    logUser(sockid, user_id);
+        
+
+    while (status) {
+        receive_message(sockid, buffer);
+        
+        if (strncmp(buffer, "/exit", strlen("/exit")) == 0){
             const char* user_id_str = buffer + strlen("/exit"); // Skip the "/exit" part
             int user_id = atoi(user_id_str);
 
@@ -261,9 +364,10 @@ void *handle_client(void *arg) {
             status = 0;
         }
         else if (strcmp(buffer, "/addContact") == 0){
-
-            sendContact(sockid);
-
+            addContact(sockid, user_id);
+        }
+        else if (strcmp(buffer, "/listContacts") == 0){
+            listContacts(sockid);
         }
         else if(strcmp(buffer, "") != 0)
             printf("%s\n", buffer);
