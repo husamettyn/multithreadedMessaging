@@ -438,7 +438,6 @@ void *handle_client(void *arg) {
             addContact(sockid, user_id);
         }
         else if (strcmp(buffer, "/deleteContact") == 0){
-            printf("fonksiyona girerim beis yok\n");
             deleteContact(sockid, user_id);
         }
         else if (strcmp(buffer, "/listContacts") == 0){
