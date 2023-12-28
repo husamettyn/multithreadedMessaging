@@ -61,11 +61,11 @@ void displayContact(user* data, int numEntries) {
 void receive_message(int client_sockfd, char* buffer) {
     memset(buffer, '\0', BUFFER_SIZE);
     read(client_sockfd, buffer, BUFFER_SIZE - 1);
-    //printf("Server Side: %s\n", buffer);
+    printf("Server Side: %s\n", buffer);
 }
 
 void send_message(int sockfd, char* message) {
-    //printf("This Side: %s\n", message);
+    printf("This Side: %s\n", message);
     if(strlen(message) >= 1)
         send(sockfd, message, strlen(message), 0);
 }
@@ -106,11 +106,42 @@ user* recvContact(int sockid, int* num, int userid){
     return data;
 }
 
-void addDeleteContact(int sockid, char* process, int userid){
+void addContact(int sockid){
     char buffer[BUFFER_SIZE];
 
     int numEntries = 0;
-    snprintf(buffer, sizeof(buffer), "%s", process);
+    snprintf(buffer, sizeof(buffer), "%s", "/addContact");
+    send_message(sockid, buffer);
+
+    do{
+        receive_message(sockid, buffer);
+    }while (strcmp(buffer, "/ok") != 0);
+
+    user* allContacts = recvContact(sockid, &numEntries, -1);
+    
+    if(allContacts != NULL){
+        displayContact(allContacts, numEntries);
+    }
+    else{
+        printf("\nErisim Hatasi.\n\n");
+        fflush(stdout);
+    }
+
+    printf("%s\nID of User: ", "Add Contact");
+    scanf("%s", buffer);
+
+    send_message(sockid, buffer);
+
+    receive_message(sockid, buffer);
+    printf("%s", buffer);
+
+}
+
+void deleteContact(int sockid, int userid){
+    char buffer[BUFFER_SIZE];
+
+    int numEntries = 0;
+    snprintf(buffer, BUFFER_SIZE, "%s", "/deleteContact");
     send_message(sockid, buffer);
 
     do{
@@ -121,24 +152,23 @@ void addDeleteContact(int sockid, char* process, int userid){
     
     if(allContacts != NULL){
         displayContact(allContacts, numEntries);
-        printf("\nDevam Etmek Icin Bir Tusa Basiniz.\n");
-        fflush(stdout);
-        getchar();
-        getchar();
     }
     else{
         printf("\nRehberiniz bos.\n\n");
-        fflush(stdout);
-        
+        memset(buffer, '\0', BUFFER_SIZE);
+        snprintf(buffer, BUFFER_SIZE, "%s", "/empty");
+        send_message(sockid, buffer);
+        return;
     }
 
-    printf("%s\nID of User: ", process);
+    printf("%s\nID of User: ", "Delete Contact");
     scanf("%s", buffer);
 
     send_message(sockid, buffer);
 
     receive_message(sockid, buffer);
     printf("%s", buffer);
+
 }
 
 void listContacts(int sockid, int userid){
@@ -187,12 +217,13 @@ void init_main(user myUser, int sockid){
                 listContacts(sockid, myUser.userid);
                 break;
             case 2:
-                addDeleteContact(sockid, "/addContact", -1);
+                // add contact
+                addContact(sockid);
 
                 break;
             case 3:
-                addDeleteContact(sockid, "/deleteContact", myUser.userid);
                 // Delete contact
+                deleteContact(sockid, myUser.userid);
                 break;
             case 4:
                 // Check messages

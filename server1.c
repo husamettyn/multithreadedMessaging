@@ -41,7 +41,7 @@ void receive_message(int client_sockfd, char* buffer) {
 }
 
 int send_message(int sockfd, char* message) {
-    //printf("This Side: %s\n", message);
+    printf("This Side: %s\n", message);
     if(strlen(message) >= 1)
         send(sockfd, message, strlen(message), 0);
 }
@@ -259,7 +259,7 @@ void logUser(int sockid, int userid) {
 
 void addContact(int sockid, int userid){
     char buffer[BUFFER_SIZE];
-    
+    printf("hs to send\n");
     send_message(sockid, "/ok");
     sendContact(sockid);
 
@@ -333,6 +333,8 @@ void addContact(int sockid, int userid){
 void deleteContact(int sockid, int userid){
     char buffer[BUFFER_SIZE];
     
+    printf("girdim bak\n");
+
     send_message(sockid, "/ok");
     sendContact(sockid);
 
@@ -340,6 +342,8 @@ void deleteContact(int sockid, int userid){
         receive_message(sockid, buffer);
     }while (strlen(buffer) == 0);
 
+    if(strcmp(buffer, "/empty") == 0)
+        return;
     int addUser = atoi(buffer);
 
     // if client wants to add himself
@@ -356,9 +360,6 @@ void deleteContact(int sockid, int userid){
     user* data = readStructFromFile(filename, &numEntries);
     user newUser;
     
-    // son eleman kalınca hepsini silmek lazım
-    // ama 
-
     while(data != NULL && i < numEntries){
         if(data[i].userid == addUser){
             int j;
@@ -416,9 +417,10 @@ void *handle_client(void *arg) {
     printf("User %d is trying to log in.\n", user_id);
     logUser(sockid, user_id);
         
-
+    printf("Login succes\n");
     while (status) {
         receive_message(sockid, buffer);
+        printf("noluyo la: %s\n", buffer);
         
         if (strncmp(buffer, "/exit", strlen("/exit")) == 0){
             const char* user_id_str = buffer + strlen("/exit"); // Skip the "/exit" part
@@ -431,6 +433,7 @@ void *handle_client(void *arg) {
             addContact(sockid, user_id);
         }
         else if (strcmp(buffer, "/deleteContact") == 0){
+            printf("fonksiyona girerim beis yok\n");
             deleteContact(sockid, user_id);
         }
         else if (strcmp(buffer, "/listContacts") == 0){
