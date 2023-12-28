@@ -10,6 +10,7 @@
 #include <pthread.h>
 #include <asm-generic/socket.h>
 #include <sys/stat.h>
+#include <time.h>
 
 #define PORT 8080
 #define BUFFER_SIZE 1024
@@ -20,6 +21,18 @@ typedef struct{
 	char name[20];
     char surname[20];
 } user;
+
+void receive_message(int client_sockfd, char* buffer) {
+    memset(buffer, '\0', BUFFER_SIZE);
+    read(client_sockfd, buffer, BUFFER_SIZE - 1);
+    printf("Client Side: %s\n", buffer);
+}
+
+int send_message(int sockfd, char* message) {
+    //printf("This Side: %s\n", message);
+    if(strlen(message) >= 1)
+        send(sockfd, message, strlen(message), 0);
+}
 
 void displayContact(user* data, int numEntries) {
     int i;
@@ -35,16 +48,18 @@ void displayContact(user* data, int numEntries) {
     printf("|──────────────────────────────────────────────────────\n");
 }
 
-void receive_message(int client_sockfd, char* buffer) {
-    memset(buffer, '\0', BUFFER_SIZE);
-    read(client_sockfd, buffer, BUFFER_SIZE - 1);
-    //printf("Client Side: %s\n", buffer);
-}
+void getCurrentDateTime(char* dateTimeString, int maxLength) {
+    time_t t;
+    struct tm* tmInfo;
 
-int send_message(int sockfd, char* message) {
-    //printf("This Side: %s\n", message);
-    if(strlen(message) >= 1)
-        send(sockfd, message, strlen(message), 0);
+    // O anki zamanı al
+    time(&t);
+    tmInfo = localtime(&t);
+
+    // Tarih ve saat bilgilerini biçimlendirip dateTimeString'e yerleştir
+    snprintf(dateTimeString, maxLength, "%02d:%02d | %02d-%02d-%04d",
+             tmInfo->tm_hour, tmInfo->tm_min,
+             tmInfo->tm_mday, tmInfo->tm_mon + 1, tmInfo->tm_year + 1900);
 }
 
 void writeStructToFile(char* filename, user* data, int numEntries) {
@@ -104,7 +119,6 @@ user* readStructFromFile(char* filename, size_t* numEntries) {
     }
 }
 
-
 void sendContact(int sockid){
     char buffer[BUFFER_SIZE];
 
@@ -160,7 +174,6 @@ void sendContact(int sockid){
 
 void initializeFileSystem(int userid) {
     // Create user directory
-
     char data_directory[] = "data";
     struct stat st_data = {0};
     if (stat(data_directory, &st_data) == -1) {
@@ -170,19 +183,10 @@ void initializeFileSystem(int userid) {
         }
     }
 
-    char user_directory[10];
-    sprintf(user_directory, "data/%d", userid);
     
-    /*
-    char user_directory[10];
-    char messages_directory[40];
-    char contacts_file[40];
-    sprintf(user_directory, "data/%d", userid);
-    sprintf(messages_directory, "%s/messages", user_directory);
-    sprintf(contacts_file, "%s/contacts.txt", user_directory);
-    */
-
     // Check if the directory already exists, if not, create it
+    char user_directory[10];
+    sprintf(user_directory, "data/%d", userid);
     struct stat st = {0};
     if (stat(user_directory, &st) == -1) {
         if (mkdir(user_directory, 0777) != 0) {
@@ -272,7 +276,6 @@ void logUser(int sockid, int userid) {
 
 void addContact(int sockid, int userid){
     char buffer[BUFFER_SIZE];
-    printf("hs to send\n");
     send_message(sockid, "/ok");
     sendContact(sockid);
 
@@ -422,6 +425,78 @@ void listContacts(int sockid){
 
 }
 
+void appendMessage(const char *filename, const char *message) {
+    FILE *file = fopen(filename, "a"); // Open file in append mode
+
+    if (file == NULL) {
+        perror("Error opening file");
+        exit(EXIT_FAILURE);
+    }
+
+    fprintf(file, "%s\n", message); // Append the message to the file
+
+    fclose(file); // Close the file
+}
+void sendMessage(int sockid, int userid){
+    char buffer[BUFFER_SIZE];
+    send_message(sockid, "/ok");
+    sendContact(sockid);
+
+    receive_message(sockid, buffer);
+
+    if(strcmp(buffer, "/emptyContact") == 0){
+        return;
+    }
+    else{
+        printf("inside1\n");
+        int i;
+        size_t numEntries;
+        char message[BUFFER_SIZE-100];
+        int destid;
+        char filename[10];
+        char msg_directory[60];
+        char date[20];
+
+        char sourceMsg[BUFFER_SIZE];
+        char destMsg[BUFFER_SIZE];
+
+        sscanf(buffer, "%d, %[^\n]", &destid, message);
+        printf("d: %d - s: %s\n", destid, message);
+
+        user* data = readStructFromFile("users.txt", &numEntries);
+        user destUser, sourceUser;
+        printf("inside2\n");
+        for (i = 0; i < numEntries; i++){
+            if(data[i].userid == userid){
+                sourceUser = data[i];
+            }
+            else if(data[i].userid == destid){
+                destUser = data[i];
+            }
+        }
+        getCurrentDateTime(date, 20);
+
+        printf("inside3\n");
+        sprintf(sourceMsg, "%s | %-15s: %s", date, "Sen", message);
+        sprintf(filename, "%d.txt", destid);
+        sprintf(msg_directory, "data/%d/messages/%s", userid, filename);
+
+        printf("dir: %s | msg: %s\n", msg_directory, sourceMsg);
+        appendMessage(msg_directory, sourceMsg);
+
+        printf("inside4\n");
+
+        sprintf(destMsg, "%s | %-15s: %s", date, sourceUser.name, message);
+        sprintf(filename, "%d.txt", userid);
+        sprintf(msg_directory, "data/%d/messages/%s", destid, filename);
+
+        printf("dir: %s | msg: %s\n", msg_directory, destMsg);
+
+        appendMessage(msg_directory, destMsg);
+        send_message(sockid, "/ok");
+    }
+}
+
 void *handle_client(void *arg) {
     int sockid = *((int *)arg);
     char buffer[BUFFER_SIZE] = {0};
@@ -455,6 +530,9 @@ void *handle_client(void *arg) {
         }
         else if (strcmp(buffer, "/listContacts") == 0){
             listContacts(sockid);
+        }
+        else if (strcmp(buffer, "/sendMessages") == 0){
+            sendMessage(sockid, user_id);
         }
         else if(strcmp(buffer, "") != 0)
             printf("%s\n", buffer);

@@ -25,11 +25,22 @@ typedef struct{
     char surname[20];
 } user;
 
+void receive_message(int client_sockfd, char* buffer) {
+    memset(buffer, '\0', BUFFER_SIZE);
+    read(client_sockfd, buffer, BUFFER_SIZE - 1);
+    //printf("Server Side: %s\n", buffer);
+}
+
+void send_message(int sockfd, char* message) {
+    printf("This Side: %s\n", message);
+    send(sockfd, message, strlen(message), 0);
+}
+
 void display_menu(user myUser) {
     int i;
     for (i = 0; i < 3; ++i) {
         usleep(500000);  // Sleep for 0.5 seconds (500,000 microseconds)
-        printf("---");
+        printf("#-#-#-");
         fflush(stdout);  // Flush the output buffer
     }
     system("clear");
@@ -57,17 +68,6 @@ void displayContact(user* data, int numEntries) {
         }
     }
     printf("|──────────────────────────────────────────────────────\n");
-}
-
-void receive_message(int client_sockfd, char* buffer) {
-    memset(buffer, '\0', BUFFER_SIZE);
-    read(client_sockfd, buffer, BUFFER_SIZE - 1);
-    //rintf("Server Side: %s\n", buffer);
-}
-
-void send_message(int sockfd, char* message) {
-    printf("This Side: %s\n", message);
-    send(sockfd, message, strlen(message), 0);
 }
 
 user* recvContact(int sockid, int* num, int userid){
@@ -199,6 +199,40 @@ void listContacts(int sockid, int userid){
     send_message(sockid, "/done");
 }
 
+void sendMessage(int sockid, int userid){
+    char buffer[BUFFER_SIZE];
+
+    int numEntries = 0;
+    snprintf(buffer, sizeof(buffer), "/sendMessages");
+    send_message(sockid, buffer);
+
+    do{
+        receive_message(sockid, buffer);
+    }while (strcmp(buffer, "/ok") != 0);
+
+    user* myContacts = recvContact(sockid, &numEntries, userid);
+    
+    if(myContacts != NULL){
+        displayContact(myContacts, numEntries);
+        memset(buffer, '\0', BUFFER_SIZE);
+        printf("\nLutfen mesajinizi giriniz.\n(Ornek Mesaj: \"3, Cuma gunu musait misin?\")\n>> ");
+        scanf(" %[^\n]", buffer);
+
+        // burada da o kişi rehberde değilse atamamamız lazım onun kontrolü önemli.
+
+        send_message(sockid, buffer);
+    }
+    else{
+        printf("\nRehberiniz bos. Lutfen rehberinize kisi ekleyiniz.\n\n");
+        send_message(sockid, "/emptyContact");
+        return;
+    }
+
+    do{
+        receive_message(sockid, buffer);
+    }while (strcmp(buffer, "/ok") != 0);
+    printf("Mesaj Gonderildi.\n");
+}
 
 void init_main(user myUser, int sockid){
     //int myNumEntries = 0;
@@ -231,6 +265,7 @@ void init_main(user myUser, int sockid){
                 // Check messages
                 break;
             case 5:
+                sendMessage(sockid, myUser.userid);
                 // Send message
                 break;
             case 6:
