@@ -61,13 +61,12 @@ void displayContact(user* data, int numEntries) {
 void receive_message(int client_sockfd, char* buffer) {
     memset(buffer, '\0', BUFFER_SIZE);
     read(client_sockfd, buffer, BUFFER_SIZE - 1);
-    printf("Server Side: %s\n", buffer);
+    //rintf("Server Side: %s\n", buffer);
 }
 
 void send_message(int sockfd, char* message) {
     printf("This Side: %s\n", message);
-    if(strlen(message) >= 1)
-        send(sockfd, message, strlen(message), 0);
+    send(sockfd, message, strlen(message), 0);
 }
 
 user* recvContact(int sockid, int* num, int userid){
@@ -195,6 +194,8 @@ void listContacts(int sockid, int userid){
         printf("\nRehberiniz bos.\n\n");
         fflush(stdout);
     }
+
+    send_message(sockid, "/done");
 }
 
 

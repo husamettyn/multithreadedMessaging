@@ -37,11 +37,11 @@ void displayContact(user* data, int numEntries) {
 void receive_message(int client_sockfd, char* buffer) {
     memset(buffer, '\0', BUFFER_SIZE);
     read(client_sockfd, buffer, BUFFER_SIZE - 1);
-    printf("Client Side: %s\n", buffer);
+    //printf("Client Side: %s\n", buffer);
 }
 
 int send_message(int sockfd, char* message) {
-    printf("This Side: %s\n", message);
+    //printf("This Side: %s\n", message);
     if(strlen(message) >= 1)
         send(sockfd, message, strlen(message), 0);
 }
@@ -123,8 +123,10 @@ void sendContact(int sockid){
     user* data = readStructFromFile(filename, &numEntries);
 
     printf("sending contacts\n");
-    if(numEntries == 0)
+    if(numEntries == 0){
         send_message(sockid, "Kayitli Kullanici Yok.");
+        return;
+    }
     else{
         snprintf(buffer, BUFFER_SIZE, "%d", (int)numEntries);
         send_message(sockid, buffer);
@@ -401,6 +403,10 @@ void listContacts(int sockid){
     char buffer[BUFFER_SIZE];
     send_message(sockid, "/ok");
     sendContact(sockid);
+    do {
+        receive_message(sockid, buffer);
+    }while(strcmp(buffer, "/done"));
+
 }
 
 void *handle_client(void *arg) {
@@ -420,7 +426,6 @@ void *handle_client(void *arg) {
     printf("Login succes\n");
     while (status) {
         receive_message(sockid, buffer);
-        printf("noluyo la: %s\n", buffer);
         
         if (strncmp(buffer, "/exit", strlen("/exit")) == 0){
             const char* user_id_str = buffer + strlen("/exit"); // Skip the "/exit" part
