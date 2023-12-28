@@ -63,39 +63,11 @@ void send_message(int sockfd, char* message) {
     send(sockfd, message, strlen(message), 0);
 }
 
-user* recvContactAll(int sockid, int* num){
-    int numEntries;
-    char buffer[BUFFER_SIZE];
-    send_message(sockid, "/recvContactAll");
-
-    receive_message(sockid, buffer, BUFFER_SIZE);
-    
-    user* data;
-
-    if(strcmp(buffer, "Kayitli Kullanici Yok.") == 0){
-        printf("Kayitli Kullanici Yok.\n");
-        return NULL;
-    }
-    else{
-        numEntries = atoi(buffer);
-        data = (user*)malloc(numEntries * sizeof(user));
-        *num = numEntries;
-    }
-    int i;
-    for(i=0; i<numEntries; i++){
-        receive_message(sockid, buffer, BUFFER_SIZE);
-        sscanf(buffer, "%[^,], %[^,], %d", data[i].name, data[i].phone, &data[i].userid);
-        printf("%s, %s %d\n", data[i].name, data[i].phone, data[i].userid);
-        send_message(sockid, "received");
-    }
-    
-    return data;
-}
-
 user* recvContact(int sockid, int* num, int userid){
     
     int numEntries;
     char buffer[BUFFER_SIZE];
+    bzero(buffer, BUFFER_SIZE);
     sprintf(buffer, "/recvContact %d", userid);
     send_message(sockid, buffer);
 
@@ -112,8 +84,12 @@ user* recvContact(int sockid, int* num, int userid){
         data = (user*)malloc(numEntries * sizeof(user));
         *num = numEntries;
     }
+
+    sprintf(buffer, "/ready");
+    send_message(sockid, buffer);
     int i;
     for(i=0; i<numEntries; i++){
+        bzero(buffer, BUFFER_SIZE);
         receive_message(sockid, buffer, BUFFER_SIZE);
         sscanf(buffer, "%[^,], %[^,], %d", data[i].name, data[i].phone, &data[i].userid);
         printf("%s, %s %d\n", data[i].name, data[i].phone, data[i].userid);
@@ -125,15 +101,12 @@ user* recvContact(int sockid, int* num, int userid){
 
 
 void init_main(user myUser, int sockid){
-    char buffer[BUFFER_SIZE];
-    int numEntries = 0;
-    user* allContacts = recvContactAll(sockid, &numEntries);
-    //displayContact(allContacts, numEntries);
-    int myNumEntries = 0;
-    user* myContacts = recvContact(sockid, &myNumEntries, myUser.userid);
+    //int myNumEntries = 0;
+    //user* myContacts = recvContact(sockid, &myNumEntries, myUser.userid);
 
     while (1){
-        bzero(buffer, BUFFER_SIZE);
+        char buffer[BUFFER_SIZE];
+
         int choice;
 
         display_menu(myUser);
@@ -144,7 +117,13 @@ void init_main(user myUser, int sockid){
                 // Display contacts
                 break;
             case 2:
-                // Add contact
+                int numEntries = 0;
+                snprintf(buffer, sizeof(buffer), "/addContact");
+                send_message(sockid, buffer);
+                
+                user* allContacts = recvContact(sockid, &numEntries, -1);
+                displayContact(allContacts, numEntries);
+
                 break;
             case 3:
                 // Delete contact
@@ -161,7 +140,6 @@ void init_main(user myUser, int sockid){
             case 7:
                 snprintf(buffer, sizeof(buffer), "/exit %d", myUser.userid);
                 send_message(sockid, buffer);
-                exit(0);
                 break;
             default:
                 printf("Invalid choice");

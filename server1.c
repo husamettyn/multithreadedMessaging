@@ -102,7 +102,6 @@ void sendContact(int sockid){
 
     size_t numEntries = 0;
     user* data = readStructFromFile(filename, &numEntries);
-    
 
     printf("sending contacts\n");
     if(numEntries == 0)
@@ -113,19 +112,23 @@ void sendContact(int sockid){
         printf("%s\n", buffer);
     }
     int i;
-    for(i=0; i<numEntries; i++){
-        char buffer2[BUFFER_SIZE];
-        bzero(buffer, BUFFER_SIZE);
-        bzero(buffer2, BUFFER_SIZE);
-        snprintf(buffer, BUFFER_SIZE, "%s, %s, %d", data[i].name, data[i].phone, data[i].userid);
-        
-        do{
-            send_message(sockid, buffer);
 
-            receive_message(sockid, buffer2, BUFFER_SIZE);
-        }while(strcmp(buffer2, "received") != 0);
-        printf("%s\n", buffer);
+    receive_message(sockid, buffer, BUFFER_SIZE);
+
+    if(strcmp(buffer, "/ready") == 0){
+        for(i=0; i<numEntries; i++){
+            char buffer2[BUFFER_SIZE];
+            bzero(buffer, BUFFER_SIZE);
+            bzero(buffer2, BUFFER_SIZE);
+            snprintf(buffer, BUFFER_SIZE, "%s, %s, %d", data[i].name, data[i].phone, data[i].userid);
+            do{
+                send_message(sockid, buffer);
+                receive_message(sockid, buffer2, BUFFER_SIZE);
+            }while(strcmp(buffer2, "received") != 0);
+            printf("%s\n", buffer);
+        }
     }
+
     return;
     
 }
@@ -172,10 +175,6 @@ void initializeFileSystem(int userid) {
             // Handle error as needed
         }
         fclose(file);
-}
-
-void sendDatas(int sockid, int userid){
-    sendContact(sockid);
 }
 
 void logUser(int sockid, int userid) {
@@ -235,17 +234,16 @@ void logUser(int sockid, int userid) {
 
     // Free allocated memory for user data
     free(data);
-
-    sendDatas(sockid, userid);
 }
 
 void *handle_client(void *arg) {
-    int socket_fd = *((int *)arg);
+    int sockid = *((int *)arg);
     char buffer[BUFFER_SIZE] = {0};
     int status = 1;
 
     while (status) {
-        receive_message(socket_fd, buffer, BUFFER_SIZE);
+        bzero(buffer, BUFFER_SIZE);
+        receive_message(sockid, buffer, BUFFER_SIZE);
         if (strncmp(buffer, "/login", strlen("/login")) == 0) {
             // Extract the user ID from the message
             const char* user_id_str = buffer + strlen("/login"); // Skip the "/login" part
@@ -253,7 +251,7 @@ void *handle_client(void *arg) {
 
             // Now you have the user ID, you can use it as needed
             printf("User %d is trying to log in.\n", user_id);
-            logUser(socket_fd, user_id);
+            logUser(sockid, user_id);
         }
         else if (strncmp(buffer, "/exit", strlen("/exit")) == 0){
             const char* user_id_str = buffer + strlen("/exit"); // Skip the "/exit" part
@@ -262,12 +260,17 @@ void *handle_client(void *arg) {
             printf("User %d is logged out\n", user_id);
             status = 0;
         }
+        else if (strcmp(buffer, "/addContact") == 0){
+
+            sendContact(sockid);
+
+        }
         else if(strcmp(buffer, "") != 0)
             printf("%s\n", buffer);
     }
 
     // Close the socket and exit the thread
-    close(socket_fd);
+    close(sockid);
     pthread_exit(NULL);
     return NULL;
 }
