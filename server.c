@@ -15,12 +15,89 @@
 #define PORT 8080
 #define BUFFER_SIZE 1024
 
+// User structure to hold user information
 typedef struct{
-	int userid;
-	char phone[20];
-	char name[20];
-    char surname[20];
+    int userid;          // User's ID
+    char phone[20];      // User's phone number
+    char name[20];       // User's first name
+    char surname[20];    // User's surname
 } user;
+
+// Function prototypes
+void receive_message(int client_sockfd, char* buffer);
+int send_message(int sockfd, char* message);
+void getCurrentDateTime(char* dateTimeString, int maxLength);
+void writeStructToFile(char* filename, user* data, int numEntries);
+user* readStructFromFile(char* filename, size_t* numEntries);
+void sendContact(int sockid);
+void initializeFileSystem(int userid);
+void logUser(int sockid, int userid);
+void addContact(int sockid, int userid);
+void deleteContact(int sockid, int userid);
+void listContacts(int sockid);
+void checkContact(int sockid, user source, int destid);
+void appendMessage(const char *filename, const char *message);
+void sendMessage(int sockid, int userid);
+int getMessages(char* messageList, char* filename, int* chatIDs);
+void checkMessages(int sockid, int userid);
+void *handle_client(void *arg);
+
+// Main function: Entry point of the program
+int main() {
+    int server_fd, new_socket;           // File descriptors for server and new socket
+    struct sockaddr_in address;          // Structure for the server address
+    int opt = 1;                         // Socket option
+    socklen_t addrlen = sizeof(address); // Length of the address
+
+    // Creating socket file descriptor
+    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
+        perror("socket failed"); // Socket creation failed
+        exit(EXIT_FAILURE);
+    }
+
+    // Forcefully attaching socket to the port 8080
+    if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt))) {
+        perror("setsockopt"); // Setting socket options failed
+        exit(EXIT_FAILURE);
+    }
+    address.sin_family = AF_INET;        // Internet Protocol
+    address.sin_addr.s_addr = INADDR_ANY; // Any incoming interface
+    address.sin_port = htons(PORT);      // Port number
+
+    // Binding the socket to the port 8080
+    if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
+        perror("bind failed"); // Bind failed
+        exit(EXIT_FAILURE);
+    }
+    if (listen(server_fd, 3) < 0) {
+        perror("listen"); // Listen failed
+        exit(EXIT_FAILURE);
+    }
+
+    printf("Server successfully started on port %d...\n", PORT);
+
+    // Main loop to accept incoming connections
+    while (1) {
+        if ((new_socket = accept(server_fd, (struct sockaddr *)&address, &addrlen)) < 0) {
+            perror("accept"); // Accept failed
+            exit(EXIT_FAILURE);
+        }
+
+        // Create a new thread for each client
+        pthread_t thread_id;
+        if (pthread_create(&thread_id, NULL, handle_client, (void *)&new_socket) != 0) {
+            perror("pthread_create"); // Thread creation failed
+            exit(EXIT_FAILURE);
+        }
+
+        // Detach the thread to avoid memory leaks
+        pthread_detach(thread_id);
+    }
+
+    // Closing the listening socket (unreachable in this code)
+    close(server_fd);
+    return 0;
+}
 
 void receive_message(int client_sockfd, char* buffer) {
     memset(buffer, '\0', BUFFER_SIZE);
@@ -676,65 +753,3 @@ void *handle_client(void *arg) {
     pthread_exit(NULL);
     return NULL;
 }
-
-int main() {
-    int server_fd, new_socket;
-    struct sockaddr_in address;
-    int opt = 1;
-    socklen_t addrlen = sizeof(address);
-
-    // Creating socket file descriptor
-    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
-        perror("socket failed");
-        exit(EXIT_FAILURE);
-    }
-
-    // Forcefully attaching socket to the port 8080
-    if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt))) {
-        perror("setsockopt");
-        exit(EXIT_FAILURE);
-    }
-    address.sin_family = AF_INET;
-    address.sin_addr.s_addr = INADDR_ANY;
-    address.sin_port = htons(PORT);
-
-    // Forcefully attaching socket to the port 8080
-    if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
-        perror("bind failed");
-        exit(EXIT_FAILURE);
-    }
-    if (listen(server_fd, 3) < 0) {
-        perror("listen");
-        exit(EXIT_FAILURE);
-    }
-
-    printf("Server succesfully started on port %d...\n", PORT);
-
-    while (1) {
-        if ((new_socket = accept(server_fd, (struct sockaddr *)&address, &addrlen)) < 0) {
-            perror("accept");
-            exit(EXIT_FAILURE);
-        }
-
-        // Create a new thread for each client
-        pthread_t thread_id;
-        if (pthread_create(&thread_id, NULL, handle_client, (void *)&new_socket) != 0) {
-            perror("pthread_create");
-            exit(EXIT_FAILURE);
-        }
-
-        // Detach the thread to avoid memory leaks
-        pthread_detach(thread_id);
-    }
-
-    // Closing the listening socket (Note: This part will not be reached in the current example)
-    close(server_fd);
-    return 0;
-}
-
-/*
-
-snprintf(buffer, BUFFER_SIZE, "%s, %s, %d", name, phone, userid);
-sscanf(buffer, "%[^,], %[^,], %d", myData.name, myData.phone, &myData.userid);
-
-*/

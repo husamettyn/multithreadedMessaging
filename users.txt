@@ -1,4 +1,0 @@
-3
-1, 1241234, Husamettin, ISIK;
-2, 709817234, Arif, AK;
-3, 17290374, Ahmet, KAYA;

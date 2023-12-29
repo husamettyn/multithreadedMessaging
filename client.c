@@ -11,19 +11,42 @@
 #define BUFFER_SIZE 1024
 #define MAX_USER 50
 
-// FLAGS
-#define LOGIN 0
-#define SEND 1
-#define RECEIVE 2
-#define DELETEUSER 4
-#define CHECKMESSAGES 5
-
 typedef struct{
 	int userid;
 	char phone[20];
 	char name[20];
     char surname[20];
 } user;
+
+// Function prototypes
+void receive_message(int client_sockfd, char* buffer);
+void send_message(int sockfd, char* message);
+void display_menu(user myUser);
+void displayContact(user* data, int numEntries);
+user* recvContact(int sockid, int* num, int userid);
+void addContact(int sockid);
+void deleteContact(int sockid, int userid);
+void listContacts(int sockid, int userid);
+void sendMessage(int sockid, int userid);
+void checkMessages(int sockid, int userid);
+void init_main(user myUser, int sockid);
+void login_to_server(int sockid, int userid);
+void connect_server(int user_id);
+
+// Main function: Entry point of the program
+int main(int argc, char* argv[]){
+
+    // Check command line arguments
+    if (argc < 2) {
+        fprintf(stderr,"usage %s userid\n", argv[0]);
+        exit(0); // Exit if not enough arguments
+    }
+
+    // Connect to server with user ID
+    connect_server(atoi(argv[1]));
+    
+    return 0; // End of program
+}
 
 void receive_message(int client_sockfd, char* buffer) {
     memset(buffer, '\0', BUFFER_SIZE);
@@ -51,7 +74,7 @@ void display_menu(user myUser) {
     printf("- 3. Delete contact\n");
     printf("- 4. Check messages\n");
     printf("- 5. Send message\n");
-    printf("- 6. Delete message\n");
+    printf("- 6. Delete message (Not Working)\n");
     printf("- 0. Logout\n");
     printf("Enter your choice: ");
 }
@@ -411,17 +434,4 @@ void connect_server(int user_id){
     login_to_server(sockid, user_id);
 
     close(sockid);
-}
-
-int main(int argc, char* argv[]){
-
-    if (argc < 2) {
-        fprintf(stderr,"usage %s userid\n", argv[0]);
-        exit(0);
-    }
-
-    connect_server(atoi(argv[1]));
-	
-
-    return 0;
 }
