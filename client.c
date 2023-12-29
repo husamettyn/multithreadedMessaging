@@ -87,7 +87,7 @@ void displayContact(user* data, int numEntries) {
     for (i = 0; i < numEntries; ++i) {
         printf("| %-10d| %-20s| %-20s| %-20s\n", data[i].userid, data[i].phone, data[i].name, data[i].surname);
         if (i < numEntries - 1) {
-            printf("|───────────|─────────────────────|────────────────────|────────────────────\n");
+            printf("|───────────|─────────────────────|─────────────────────|───────────────────\n");
         }
     }
     printf("|───────────────────────────────────────────────────────────────────────────\n");
@@ -278,11 +278,10 @@ void checkMessages(int sockid, int userid){
         return;
     }
 
-    printf("Message List\n%s\n\nGoruntulemek istediginiz konusmanin ID'sini yaziniz: ", buffer);
+    printf("Message List\n%s\n\nMesajini goruntulemek istediginiz kisinin ID'sini yaziniz: ", buffer);
     scanf("%d", &choice);
     
     sprintf(buffer, "%d", choice);
-
     send_message(sockid, buffer);
     send_message(sockid, "/start");
 
