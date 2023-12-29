@@ -32,7 +32,7 @@ void receive_message(int client_sockfd, char* buffer) {
 }
 
 void send_message(int sockfd, char* message) {
-    printf("This Side: %s\n", message);
+    //printf("This Side: %s\n", message);
     send(sockfd, message, strlen(message), 0);
 }
 
@@ -52,22 +52,23 @@ void display_menu(user myUser) {
     printf("- 4. Check messages\n");
     printf("- 5. Send message\n");
     printf("- 6. Delete message\n");
-    printf("- 7. Logout\n");
+    printf("- 7. Refresh\n");
+    printf("- 8. Logout\n");
     printf("Enter your choice: ");
 }
 
 void displayContact(user* data, int numEntries) {
     int i;
     printf("| %-10s| %-20s| %-20s| %-20s\n", "User ID", "Phone", "Name", "Surname");
-    printf("|──────────────────────────────────────────────────────\n");
+    printf("|───────────────────────────────────────────────────────────────────────────\n");
 
     for (i = 0; i < numEntries; ++i) {
         printf("| %-10d| %-20s| %-20s| %-20s\n", data[i].userid, data[i].phone, data[i].name, data[i].surname);
         if (i < numEntries - 1) {
-            printf("|───────────|─────────────────────|────────────────────\n");
+            printf("|───────────|─────────────────────|────────────────────|────────────────────\n");
         }
     }
-    printf("|──────────────────────────────────────────────────────\n");
+    printf("|───────────────────────────────────────────────────────────────────────────\n");
 }
 
 user* recvContact(int sockid, int* num, int userid){
@@ -186,8 +187,7 @@ void listContacts(int sockid, int userid){
     
     if(myContacts != NULL){
         displayContact(myContacts, numEntries);
-        printf("\nDevam Etmek Icin Bir Tusa Basiniz.\n");
-        fflush(stdout);
+        printf("\nDevam Etmek Icin Bir Tusa Basiniz. ");
         getchar();
         getchar();
     }
@@ -228,10 +228,56 @@ void sendMessage(int sockid, int userid){
         return;
     }
 
+    
+    receive_message(sockid, buffer);
+ 
+    printf("%s\n", buffer);
+}
+
+void checkMessages(int sockid, int userid){
+    char buffer[BUFFER_SIZE];
+
+    int numEntries = 0;
+    snprintf(buffer, sizeof(buffer), "/checkMessages");
+    send_message(sockid, buffer);
+
     do{
         receive_message(sockid, buffer);
     }while (strcmp(buffer, "/ok") != 0);
-    printf("Mesaj Gonderildi.\n");
+
+    int choice;
+    
+    send_message(sockid, "/ok");
+
+    receive_message(sockid, buffer);
+
+    if(strcmp(buffer, "/noFile") == 0){
+        printf("Henuz mesajiniz yok.\n");
+        return;
+    }
+
+    printf("Message List\n%s\n\nGoruntulemek istediginiz konusmanin ID'sini yaziniz: ", buffer);
+    scanf("%d", &choice);
+    
+    sprintf(buffer, "%d", choice);
+
+    send_message(sockid, buffer);
+    send_message(sockid, "/start");
+
+    
+    memset(buffer, '\0', BUFFER_SIZE);
+    int status = 1;
+    do{
+        receive_message(sockid, buffer);
+        if(strcmp(buffer, "/EOF") == 0)
+            return;
+        printf("%s", buffer);
+
+        send_message(sockid, "/c");
+    }while(1);
+
+    printf("Devam etmek icin herhangi bir tusa basiniz ");
+    getchar();
 }
 
 void init_main(user myUser, int sockid){
@@ -250,28 +296,31 @@ void init_main(user myUser, int sockid){
         switch (choice) {
             case 1:
                 // Display contacts
-                listContacts(sockid, myUser.userid);
+                    listContacts(sockid, myUser.userid);
                 break;
             case 2:
                 // add contact
-                addContact(sockid);
-
+                   addContact(sockid);
                 break;
             case 3:
                 // Delete contact
-                deleteContact(sockid, myUser.userid);
+                   deleteContact(sockid, myUser.userid);
                 break;
             case 4:
                 // Check messages
+                    checkMessages(sockid, myUser.userid);
                 break;
             case 5:
-                sendMessage(sockid, myUser.userid);
                 // Send message
+                    sendMessage(sockid, myUser.userid);
                 break;
             case 6:
                 // Delete message
                 break;
             case 7:
+
+                break;
+            case 8:
                 snprintf(buffer, sizeof(buffer), "/exit %d", myUser.userid);
                 send_message(sockid, buffer);
                 exit(0);

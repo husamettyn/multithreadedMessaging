@@ -25,7 +25,7 @@ typedef struct{
 void receive_message(int client_sockfd, char* buffer) {
     memset(buffer, '\0', BUFFER_SIZE);
     read(client_sockfd, buffer, BUFFER_SIZE - 1);
-    printf("Client Side: %s\n", buffer);
+    //printf("Client Side: %s\n", buffer);
 }
 
 int send_message(int sockfd, char* message) {
@@ -134,7 +134,7 @@ void sendContact(int sockid){
     else{
         sprintf(filename, "users.txt");
     }
-
+    
     size_t numEntries = 0;
     user* data = readStructFromFile(filename, &numEntries);
 
@@ -170,6 +170,19 @@ void sendContact(int sockid){
 
     return;
     
+}
+
+void appendMessage(const char *filename, const char *message) {
+    FILE *file = fopen(filename, "a"); // Open file in append mode
+
+    if (file == NULL) {
+        perror("Error opening file");
+        exit(EXIT_FAILURE);
+    }
+
+    fprintf(file, "%s\n", message); // Append the message to the file
+
+    fclose(file); // Close the file
 }
 
 void initializeFileSystem(int userid) {
@@ -350,8 +363,6 @@ void addContact(int sockid, int userid){
 void deleteContact(int sockid, int userid){
     char buffer[BUFFER_SIZE];
     
-    printf("girdim bak\n");
-
     send_message(sockid, "/ok");
     sendContact(sockid);
 
@@ -425,17 +436,46 @@ void listContacts(int sockid){
 
 }
 
-void appendMessage(const char *filename, const char *message) {
-    FILE *file = fopen(filename, "a"); // Open file in append mode
+void checkContact(int sockid, user source, int destid){
+    char filename[20];
+    sprintf(filename, "data/%d/contacts.txt", destid);
+    size_t numEntries = 0;
+    user* data = readStructFromFile(filename, &numEntries);
 
-    if (file == NULL) {
-        perror("Error opening file");
-        exit(EXIT_FAILURE);
+    int i, found;
+    user newUser;
+
+    while(data != NULL && i < numEntries){
+        if(data[i].userid == source.userid){
+            send_message(sockid, "Message Sent");
+            return;
+        }
+        i++;
     }
 
-    fprintf(file, "%s\n", message); // Append the message to the file
+    user* temp = realloc(data, (numEntries + 1) * sizeof(user));
 
-    fclose(file); // Close the file
+    if (temp == NULL) {
+        fprintf(stderr, "Error reallocating memory.\n");
+        free(data);  // Free original data before exiting
+        exit(EXIT_FAILURE);
+    }
+    data = temp;
+
+    strcpy(data[numEntries].name, source.name);
+    strcpy(data[numEntries].surname, source.surname);
+    strcpy(data[numEntries].phone, source.phone);
+    data[numEntries].userid = source.userid;
+    printf("%s, %s, %s, %d\n", data[numEntries].name, data[numEntries].surname, data[numEntries].phone, data[numEntries].userid);
+    // Update the number of entries
+    numEntries++;
+
+    // Save the updated user data to the file
+    writeStructToFile(filename, data, numEntries);
+    send_message(sockid, "You've added to %d's contact list \nMessage Sent");
+
+    return;
+
 }
 
 void sendMessage(int sockid, int userid){
@@ -485,12 +525,105 @@ void sendMessage(int sockid, int userid){
         appendMessage(msg_directory, destMsg);
 
         sprintf(destMsg, "(Yeni Mesaj!) %s %s %d", sourceUser.name, sourceUser.surname, sourceUser.userid);
-        sprintf(msg_directory, "data/%d/messages/newMessages.txt", destid);
+        sprintf(msg_directory, "data/%d/messages/messages.txt", destid);
         appendMessage(msg_directory, destMsg);
 
-        send_message(sockid, "/ok");
+        // check if destination added source
+        checkContact(sockid, sourceUser, destUser.userid);
 
     }
+}
+
+int getMessages(char* messageList, char* filename, int* chatIDs) {
+    FILE* file = fopen(filename, "r");
+    
+    if (file == NULL) {
+        perror("Error opening file");
+        return 1;
+    }
+
+    int lineNumber = 1;
+    char dummy1[200];
+    char dummy2[100];
+    memset(dummy2, '\0', 100);
+    memset(dummy1, '\0', 200);
+
+    // Assuming each line in the file is a message
+    while (fgets(dummy2, 100, file) != NULL) {
+        // Add line number to the messageList
+        chatIDs[lineNumber-1] = atoi(&dummy2[strlen(dummy2)-2]);
+        sprintf(dummy1, "%d - %s", lineNumber, dummy2);
+        strcat(messageList, dummy1);
+        memset(dummy2, '\0', 200);
+
+        lineNumber++;
+    }
+
+    fclose(file);
+    return 0;
+}
+
+void checkMessages(int sockid, int userid){
+    char buffer[BUFFER_SIZE];
+    int status = 1;
+    
+    send_message(sockid, "/ok");
+
+    char messageList[BUFFER_SIZE];
+    memset(messageList, '\0', BUFFER_SIZE);
+    char filename[40];
+    int chatIDs[40];
+    sprintf(filename, "data/%d/messages/messages.txt", userid);
+    status = getMessages(messageList, filename, chatIDs);
+    do{
+        receive_message(sockid, buffer);
+    }while (strcmp(buffer, "/ok") != 0);
+
+    if(status){
+        send_message(sockid, "/noFile");
+        return;
+    }
+
+    send_message(sockid, messageList);
+
+    do{
+        receive_message(sockid, buffer);
+    }while (strcmp(buffer, "") == 0);
+
+    int chatid = atoi(buffer);
+
+    printf("ID: %d\n", chatid);
+
+    sprintf(filename, "data/%d/messages/%d.txt", userid, chatid);
+
+    // yeni mesajları topla
+    // client'a gönder
+
+    FILE* file = fopen(filename, "r");
+    
+    char dummy[200];
+    memset(dummy, '\0', 200);
+
+    do{
+        receive_message(sockid, buffer);
+    }while (strcmp(buffer, "/start") != 0);
+    printf("Got start\n");
+
+    // Assuming each line in the file is a message
+    while (fgets(dummy, 100, file) != NULL) {
+        // Add line number to the messageList
+        printf("%s", dummy);
+        send_message(sockid, dummy);
+
+        receive_message(sockid, buffer);
+    }
+
+    send_message(sockid, "/EOF");
+
+    
+
+    fclose(file);
+    
 }
 
 void *handle_client(void *arg) {
@@ -529,6 +662,12 @@ void *handle_client(void *arg) {
         }
         else if (strcmp(buffer, "/sendMessages") == 0){
             sendMessage(sockid, user_id);
+        }
+        else if (strcmp(buffer, "/checkMessages") == 0){
+            checkMessages(sockid, user_id);
+        }
+        else if (strcmp(buffer, "/deleteMessage") == 0){
+            
         }
         else if(strcmp(buffer, "") != 0)
             printf("%s\n", buffer);
