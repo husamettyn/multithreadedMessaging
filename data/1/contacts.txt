@@ -1,5 +1,3 @@
-4
-2, 3485892, batuhan, odcikin;
-3, 47838172, safi, ozturk;
-5, 12397123, yusuf, durumlu;
-8, 179283749, Yunus, DOGAN;
+2
+2, 709817234, Arif, AK;
+3, 17290374, Ahmet, KAYA;

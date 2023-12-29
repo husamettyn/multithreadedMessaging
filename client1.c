@@ -52,8 +52,7 @@ void display_menu(user myUser) {
     printf("- 4. Check messages\n");
     printf("- 5. Send message\n");
     printf("- 6. Delete message\n");
-    printf("- 7. Refresh\n");
-    printf("- 8. Logout\n");
+    printf("- 0. Logout\n");
     printf("Enter your choice: ");
 }
 
@@ -264,19 +263,21 @@ void checkMessages(int sockid, int userid){
     send_message(sockid, buffer);
     send_message(sockid, "/start");
 
-    
+    printf("\nMesajlar:\n");
     memset(buffer, '\0', BUFFER_SIZE);
     int status = 1;
     do{
         receive_message(sockid, buffer);
         if(strcmp(buffer, "/EOF") == 0)
-            return;
-        printf("%s", buffer);
+            status = 0;
+        else
+            printf("%s", buffer);
 
         send_message(sockid, "/c");
-    }while(1);
+    }while(status);
 
-    printf("Devam etmek icin herhangi bir tusa basiniz ");
+    printf("\nDevam etmek icin herhangi bir tusa basiniz ");
+    getchar();
     getchar();
 }
 
@@ -317,10 +318,7 @@ void init_main(user myUser, int sockid){
             case 6:
                 // Delete message
                 break;
-            case 7:
-
-                break;
-            case 8:
+            case 0:
                 snprintf(buffer, sizeof(buffer), "/exit %d", myUser.userid);
                 send_message(sockid, buffer);
                 exit(0);

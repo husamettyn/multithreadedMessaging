@@ -1,3 +1,2 @@
-2
-1, 1234567, husamettin, isiktas;
-5, 12397123, yusuf, durumlu;
+1
+1, 1241234, Husamettin, ISIK;

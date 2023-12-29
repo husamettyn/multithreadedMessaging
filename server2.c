@@ -182,7 +182,6 @@ void initializeFileSystem(int userid) {
             // Handle error as needed
         }
     }
-
     
     // Check if the directory already exists, if not, create it
     char user_directory[10];
@@ -205,10 +204,26 @@ void initializeFileSystem(int userid) {
         }
     }
 
+    char filename[40];
+    sprintf(filename, "%s/messages/messages.txt", user_directory);
+    FILE* file = fopen(filename, "a");  // Open for append
+    if (file == NULL) {
+        fprintf(stderr, "Error creating contacts file for userid %d\n", userid);
+        // Handle error as needed
+    }
+    fclose(file);
+
+    sprintf(filename, "%s/messages/newMessages.txt", user_directory);
+    file = fopen(filename, "a");  // Open for append
+    if (file == NULL) {
+        fprintf(stderr, "Error creating contacts file for userid %d\n", userid);
+        // Handle error as needed
+    }
+    fclose(file);
+
     // Create contacts file
-    char contacts_file[40];
-    sprintf(contacts_file, "%s/contacts.txt", user_directory);
-    FILE* file = fopen(contacts_file, "a");  // Open for append
+    sprintf(filename, "%s/contacts.txt", user_directory);
+    file = fopen(filename, "a");  // Open for append
     if (file == NULL) {
         fprintf(stderr, "Error creating contacts file for userid %d\n", userid);
         // Handle error as needed
@@ -465,18 +480,48 @@ void checkContact(int sockid, user source, int destid){
 
 }
 
-void appendMessage(const char *filename, const char *message) {
 
-    FILE* file = fopen(filename, "a"); // Open file in append mode
+int isMessageExists(const char *filename, const char *message) {
+    FILE *file = fopen(filename, "r");
 
     if (file == NULL) {
+        return 0; // Dosya mevcut değilse, message de mevcut olamaz
+    }
+
+    char buffer[256]; // Gerekirse buffer boyutunu ayarlayın
+
+    // Her satırı okuyun ve mesajın mevcut olup olmadığını kontrol edin
+    while (fgets(buffer, sizeof(buffer), file) != NULL) {
+        if (strcmp(buffer, message) == 0) {
+            fclose(file);
+            return 1; // Mesaj zaten mevcut
+        }
+    }
+
+    fclose(file);
+    return 0; // Mesaj mevcut değil
+}
+
+void appendMessage(const char *filename, const char *message) {
+    // Dosya mevcut değilse oluşturun
+    FILE *file = fopen(filename, "a+"); // "a+" modu, dosyayı açar veya oluşturur
+
+    if (file == NULL) {
+        printf("%s\n", filename);
         perror("Error opening file");
         exit(EXIT_FAILURE);
     }
 
-    fprintf(file, "%s\n", message); // Append the message to the file
+    // Mesaj zaten varsa ekleme
+    if (isMessageExists(filename, message)) {
+        printf("Message already exists. Not appending.\n");
+        fclose(file);
+        return;
+    }
 
-    fclose(file); // Close the file
+    fprintf(file, "%s\n", message); // Mesajı dosyaya ekle
+
+    fclose(file); // Dosyayı kapat
 }
 
 void sendMessage(int sockid, int userid){
@@ -525,11 +570,13 @@ void sendMessage(int sockid, int userid){
         sprintf(msg_directory, "data/%d/messages/%d.txt", destid, userid);
         appendMessage(msg_directory, destMsg);
 
-        
         sprintf(destMsg, "%s %s %d", sourceUser.name, sourceUser.surname, sourceUser.userid);
         sprintf(msg_directory, "data/%d/messages/messages.txt", destid);
         appendMessage(msg_directory, destMsg);
-        
+
+        sprintf(destMsg, "%s %s'dan yeni mesaj", sourceUser.name, sourceUser.surname);
+        sprintf(msg_directory, "data/%d/messages/newMessages.txt", destid);
+        appendMessage(msg_directory, destMsg);
 
         // check if destination added source
         checkContact(sockid, sourceUser, destUser.userid);
@@ -537,10 +584,25 @@ void sendMessage(int sockid, int userid){
 }
 
 int getMessages(char* messageList, char* filename, int* chatIDs) {
+    char newfilename[50];
+    sprintf(newfilename, "%s%s", filename, "newMessages.txt");
+
     FILE* file = fopen(filename, "r+");
+
+    char line[100];
+    while (fgets(line, 100, file) != NULL) {
+        // Add line number to the messageList
+        strcat(messageList, line);
+        memset(line, '\0', 100);
+    }
+
+
+    fclose(file);
+    sprintf(newfilename, "%s%s", filename, "messages.txt");
+    file = fopen(filename, "r+");
     
     if (file == NULL) {
-        printf("get message\n");
+        printf("%s\n", filename);
         perror("Error opening file");
         return 1;
     }
@@ -576,7 +638,7 @@ void checkMessages(int sockid, int userid){
     memset(messageList, '\0', BUFFER_SIZE);
     char filename[40];
     int chatIDs[40];
-    sprintf(filename, "data/%d/messages/messages.txt", userid);
+    sprintf(filename, "data/%d/messages/", userid);
     status = getMessages(messageList, filename, chatIDs);
     do{
         receive_message(sockid, buffer);
