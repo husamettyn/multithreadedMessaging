@@ -459,12 +459,11 @@ void checkContact(int sockid, user source, int destid){
 
     // Save the updated user data to the file
     writeStructToFile(filename, data, numEntries);
-    send_message(sockid, "You've added to %d's contact list \nMessage Sent", destid);
+    send_message(sockid, "You've added to destination's contact list \nMessage Sent");
 
     return;
 
 }
-
 
 void appendMessage(const char *filename, const char *message) {
     FILE *file = fopen(filename, "a"); // Open file in append mode
@@ -477,45 +476,6 @@ void appendMessage(const char *filename, const char *message) {
     fprintf(file, "%s\n", message); // Append the message to the file
 
     fclose(file); // Close the file
-}
-
-void addMessage(const char *filename, const char *message) {
-    FILE *file = fopen(filename, "w"); // Open file in append mode
-
-    if (file == NULL) {
-        printf("add message\n");
-        perror("Error opening file");
-        exit(EXIT_FAILURE);
-    }
-
-    fprintf(file, "%s\n", message);
-
-    fclose(file); // Close the file
-}
-
-void addNewMessage(char* dir, char* msg){
-    char buffer[BUFFER_SIZE];
-    char line[100];
-    char msgLong[100] = "(Yeni Mesaj!) ";
-    strcat(msgLong, msg);
-    FILE *file = fopen(dir, "r+"); // Open file in append mode
-
-    if (file == NULL) {
-        printf("add new message\n");
-        perror("Error opening file");
-        exit(EXIT_FAILURE);
-    }
-
-    while (fgets(line, sizeof(line), file) != NULL) {
-        if(strcmp(line, msg) == 0)
-            strcat(buffer, msgLong);
-        else
-            strcat(buffer, line);
-    }
-
-    fclose(file); // Close the file
-
-    addMessage(dir, buffer);
 }
 
 void sendMessage(int sockid, int userid){
@@ -605,36 +565,6 @@ int getMessages(char* messageList, char* filename, int* chatIDs) {
     return 0;
 }
 
-void makeNewOld(char* filename, int chatid){
-    FILE* file = fopen(filename, "r+");
-    
-    if (file == NULL) {
-        printf("make new old\n");
-        perror("Error opening file");
-        return;
-    }
-    
-    char buffer[BUFFER_SIZE];
-    int lineID;
-    char line[100];
-    memset(line, '\0', 200);
-
-    // Assuming each line in the file is a message
-    while (fgets(line, 100, file) != NULL) {
-        // Add line number to the messageList
-
-        lineID = atoi(&line[strlen(line)-2]);
-        if(lineID != chatid)
-            strcat(buffer, line);
-        else
-            strcat(buffer, line + strlen("(Yeni Mesaj!)"));
-    }
-
-    fclose(file);
-
-    addMessage(filename, buffer);
-}
-
 void checkMessages(int sockid, int userid){
     char buffer[BUFFER_SIZE];
     int status = 1;
@@ -667,9 +597,6 @@ void checkMessages(int sockid, int userid){
     printf("ID: %d\n", chatid);
 
     sprintf(filename, "data/%d/messages/%d.txt", userid, chatid);
-
-    // yeni mesajları topla
-    // client'a gönder
 
     FILE* file = fopen(filename, "r+");
     
